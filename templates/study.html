@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Lernen: {{ deck.name }} – LernApp{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Decks</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('deck_detail', deck_id=deck.id) }}">{{ deck.name }}</a></li>
+        <li class="breadcrumb-item active">Lernen</li>
+      </ol>
+    </nav>
+  </div>
+  <a href="{{ url_for('deck_detail', deck_id=deck.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-x-lg me-1"></i>Beenden
+  </a>
+</div>
+
+<!-- Progress -->
+<div class="mb-4">
+  <div class="d-flex justify-content-between small text-muted mb-1">
+    <span id="progress-text">Karte 1 von {{ cards|length }}</span>
+    <span id="progress-percent">0%</span>
+  </div>
+  <div class="progress" style="height: 8px;">
+    <div id="progress-bar" class="progress-bar bg-success" style="width: 0%; transition: width 0.4s ease;"></div>
+  </div>
+</div>
+
+<!-- Flashcard -->
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="flashcard-scene mb-4" id="flashcard-scene">
+      <div class="flashcard" id="flashcard">
+        <div class="flashcard-face flashcard-front">
+          <div class="label">Frage</div>
+          <div class="content" id="card-front"></div>
+          <div class="hint mt-3 text-muted small"><i class="bi bi-hand-index me-1"></i>Klicke zum Umdrehen</div>
+        </div>
+        <div class="flashcard-face flashcard-back">
+          <div class="label text-success">Antwort</div>
+          <div class="content" id="card-back"></div>
+          <div class="hint mt-3 text-muted small"><i class="bi bi-hand-index me-1"></i>Klicke zum Umdrehen</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="d-flex justify-content-center gap-3 mb-3" id="nav-controls">
+      <button class="btn btn-outline-secondary" id="btn-prev" onclick="prevCard()">
+        <i class="bi bi-arrow-left me-1"></i>Zurück
+      </button>
+      <button class="btn btn-outline-primary" id="btn-flip" onclick="flipCard()">
+        <i class="bi bi-arrow-repeat me-1"></i>Umdrehen
+      </button>
+      <button class="btn btn-primary" id="btn-next" onclick="nextCard()">
+        Weiter<i class="bi bi-arrow-right ms-1"></i>
+      </button>
+    </div>
+
+    <!-- Keyboard hint -->
+    <div class="text-center text-muted small">
+      <i class="bi bi-keyboard me-1"></i>
+      <kbd>←</kbd> Zurück &nbsp;
+      <kbd>Leertaste</kbd> Umdrehen &nbsp;
+      <kbd>→</kbd> Weiter
+    </div>
+  </div>
+</div>
+
+<!-- Finished screen (hidden initially) -->
+<div class="row justify-content-center d-none" id="finish-screen">
+  <div class="col-md-6 text-center">
+    <div class="card shadow-sm py-5">
+      <div class="card-body">
+        <i class="bi bi-trophy-fill display-1 text-warning"></i>
+        <h3 class="mt-3">Alle Karten gelernt!</h3>
+        <p class="text-muted">Du hast alle {{ cards|length }} Karten von <strong>{{ deck.name }}</strong> durchgegangen.</p>
+        <div class="d-flex justify-content-center gap-3 mt-4">
+          <button class="btn btn-success" onclick="restart()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Nochmal
+          </button>
+          <a href="{{ url_for('deck_detail', deck_id=deck.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurück zum Deck
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const cards = {{ cards | map(attribute='front') | list | tojson }};
+  const cardBacks = {{ cards | map(attribute='back') | list | tojson }};
+  let current = 0;
+  let flipped = false;
+
+  function showCard(index) {
+    const flashcard = document.getElementById('flashcard');
+    flashcard.classList.remove('is-flipped');
+    flipped = false;
+
+    // Small delay so the flip resets visually before new content appears
+    setTimeout(() => {
+      document.getElementById('card-front').textContent = cards[index];
+      document.getElementById('card-back').textContent = cardBacks[index];
+    }, 150);
+
+    document.getElementById('btn-prev').disabled = index === 0;
+
+    const total = cards.length;
+    const done = index;
+    const pct = Math.round((done / total) * 100);
+    document.getElementById('progress-text').textContent = `Karte ${index + 1} von ${total}`;
+    document.getElementById('progress-percent').textContent = pct + '%';
+    document.getElementById('progress-bar').style.width = pct + '%';
+  }
+
+  function flipCard() {
+    const flashcard = document.getElementById('flashcard');
+    flipped = !flipped;
+    flashcard.classList.toggle('is-flipped', flipped);
+  }
+
+  function nextCard() {
+    if (current < cards.length - 1) {
+      current++;
+      showCard(current);
+    } else {
+      showFinish();
+    }
+  }
+
+  function prevCard() {
+    if (current > 0) {
+      current--;
+      showCard(current);
+    }
+  }
+
+  function showFinish() {
+    document.getElementById('flashcard-scene').closest('.col-md-8').closest('.row').classList.add('d-none');
+    document.querySelectorAll('#nav-controls, .text-center.text-muted.small').forEach(el => el.classList.add('d-none'));
+    document.getElementById('finish-screen').classList.remove('d-none');
+    document.getElementById('progress-bar').style.width = '100%';
+    document.getElementById('progress-percent').textContent = '100%';
+  }
+
+  function restart() {
+    current = 0;
+    document.getElementById('finish-screen').classList.add('d-none');
+    document.getElementById('flashcard-scene').closest('.col-md-8').closest('.row').classList.remove('d-none');
+    document.querySelectorAll('#nav-controls').forEach(el => el.classList.remove('d-none'));
+    showCard(0);
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') nextCard();
+    else if (e.key === 'ArrowLeft') prevCard();
+    else if (e.key === ' ') { e.preventDefault(); flipCard(); }
+  });
+
+  // Click on card to flip
+  document.getElementById('flashcard').addEventListener('click', flipCard);
+
+  // Init
+  showCard(0);
+</script>
+{% endblock %}

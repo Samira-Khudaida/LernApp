@@ -1,0 +1,97 @@
+/* ── Flashcard 3D Flip ──────────────────────────────────────────────────── */
+.flashcard-scene {
+  width: 100%;
+  height: 260px;
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.flashcard {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 1rem;
+}
+
+.flashcard.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flashcard-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  text-align: center;
+}
+
+.flashcard-front {
+  background: #ffffff;
+  border: 2px solid #0d6efd;
+}
+
+.flashcard-back {
+  background: #f0fdf4;
+  border: 2px solid #198754;
+  transform: rotateY(180deg);
+}
+
+.flashcard-face .label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6c757d;
+  margin-bottom: 0.75rem;
+}
+
+.flashcard-face .content {
+  font-size: 1.35rem;
+  font-weight: 500;
+  color: #212529;
+  line-height: 1.4;
+}
+
+.flashcard-face .hint {
+  position: absolute;
+  bottom: 1rem;
+}
+
+/* ── Deck cards hover ───────────────────────────────────────────────────── */
+.deck-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.deck-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+.card-item {
+  transition: box-shadow 0.2s ease;
+}
+
+.card-item:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ── Misc ───────────────────────────────────────────────────────────────── */
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main.container {
+  flex: 1;
+}
