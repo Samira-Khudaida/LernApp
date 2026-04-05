@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="LernApp"/>
+  <meta name="theme-color" content="#0d6efd"/>
+  <link rel="manifest" href="./manifest.json"/>
+  <link rel="apple-touch-icon" href="./icons/icon-192.png"/>
+  <title>LernApp – Karteikarten</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+  <link href="./style.css" rel="stylesheet"/>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="app-header" id="app-header">
+  <button class="back-btn" id="header-back" style="display:none">
+    <i class="bi bi-arrow-left"></i>
+  </button>
+  <h1 id="header-title"><i class="bi bi-stack me-2"></i>LernApp</h1>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  VIEW: Decks                                                          -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="view-decks" class="view px-3 pt-3">
+  <div id="decks-list"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  VIEW: Deck Detail                                                    -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="view-detail" class="view px-3 pt-3">
+  <div id="detail-stats"></div>
+
+  <!-- Action buttons -->
+  <div class="d-flex gap-2 mb-3 flex-wrap">
+    <button id="detail-study-btn" class="btn btn-success flex-fill">
+      <i class="bi bi-play-circle me-1"></i>Lernen
+    </button>
+    <button id="detail-add-btn" class="btn btn-primary flex-fill">
+      <i class="bi bi-plus-lg me-1"></i>Karte
+    </button>
+    <button id="detail-progress-btn" class="btn btn-outline-primary">
+      <i class="bi bi-bar-chart-line"></i>
+    </button>
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-three-dots"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button class="dropdown-item" id="detail-edit-btn">
+          <i class="bi bi-pencil me-2"></i>Deck bearbeiten</button></li>
+        <li><button class="dropdown-item" id="detail-export-csv-btn">
+          <i class="bi bi-filetype-csv me-2"></i>Als CSV exportieren</button></li>
+        <li><button class="dropdown-item" id="detail-export-json-btn">
+          <i class="bi bi-download me-2"></i>Als JSON exportieren</button></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><button class="dropdown-item text-danger" id="detail-delete-btn">
+          <i class="bi bi-trash me-2"></i>Deck löschen</button></li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="detail-cards"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  VIEW: New / Edit Deck                                                -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="view-newDeck" class="view px-3 pt-3">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form id="deck-form">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+          <input id="deck-form-name" type="text" class="form-control form-control-lg"
+                 placeholder="z.B. Vokabeln Englisch" required autofocus/>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Beschreibung</label>
+          <textarea id="deck-form-desc" class="form-control" rows="2"
+                    placeholder="Optional"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 btn-lg">
+          <i class="bi bi-check-lg me-1"></i>Speichern
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="view-editDeck" class="view px-3 pt-3">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form id="deck-edit-form">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+          <input id="deck-edit-name" type="text" class="form-control form-control-lg" required/>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Beschreibung</label>
+          <textarea id="deck-edit-desc" class="form-control" rows="2"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 btn-lg">
+          <i class="bi bi-check-lg me-1"></i>Speichern
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  VIEW: New / Edit Card                                                -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="view-newCard" class="view px-3 pt-3">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form id="card-form">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            <span class="badge bg-primary me-1">Vorderseite</span> Frage / Begriff
+          </label>
+          <textarea id="card-form-front" class="form-control" rows="3"
+                    placeholder="z.B. What is the capital of France?" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            <span class="badge bg-success me-1">Rückseite</span> Antwort
+          </label>
+          <textarea id="card-form-back" class="form-control" rows="3"
+                    placeholder="z.B. Paris" required></textarea>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-plus-lg me-1"></i>Speichern &amp; Nächste
+          </button>
+          <button type="button" id="card-form-done" class="btn btn-outline-secondary">
+            <i class="bi bi-check-lg me-1"></i>Fertig
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="view-editCard" class="view px-3 pt-3">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form id="card-edit-form">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            <span class="badge bg-primary me-1">Vorderseite</span>
+          </label>
+          <textarea id="card-edit-front" class="form-control" rows="3" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            <span class="badge bg-success me-1">Rückseite</span>
+          </label>
+          <textarea id="card-edit-back" class="form-control" rows="3" required></textarea>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-check-lg me-1"></i>Speichern
+          </button>
+          <button type="button" id="card-edit-done" class="btn btn-outline-secondary">
+            Abbrechen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  VIEW: Study Mode                                                     -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="view-study" class="view px-3 pt-2">
+  <!-- Progress bar -->
+  <div class="mb-3">
+    <div class="d-flex justify-content-between small fw-semibold mb-1">
+      <span id="study-progress-label">1 / 0</span>
+      <span>
+        <span class="text-danger me-2"><span id="study-stat-red">0</span> <i class="bi bi-circle-fill" style="font-size:.5rem;"></i></span>
+        <span class="text-warning me-2"><span id="study-stat-yellow">0</span> <i class="bi bi-circle-fill" style="font-size:.5rem;"></i></span>
+        <span class="text-success"><span id="study-stat-green">0</span> <i class="bi bi-circle-fill" style="font-size:.5rem;"></i></span>
+      </span>
+    </div>
+    <div class="progress" style="height:10px;border-radius:8px;overflow:hidden;">
+      <div id="study-bar-red"    class="progress-bar bg-danger"  style="width:0%;transition:width .4s;"></div>
+      <div id="study-bar-yellow" class="progress-bar bg-warning" style="width:0%;transition:width .4s;"></div>
+      <div id="study-bar-green"  class="progress-bar bg-success" style="width:0%;transition:width .4s;"></div>
+    </div>
+  </div>
+
+  <!-- Main study area -->
+  <div id="study-main">
+    <div class="text-center mb-2" id="study-card-badge"></div>
+
+    <!-- Flashcard -->
+    <div class="flashcard-scene mb-3" id="study-flashcard-scene">
+      <div class="flashcard" id="flashcard-inner">
+        <div class="flashcard-face flashcard-front">
+          <div class="fc-label">Frage</div>
+          <div class="fc-content" id="study-front-text"></div>
+          <div class="fc-hint"><i class="bi bi-hand-index me-1"></i>Tippe zum Aufdecken</div>
+        </div>
+        <div class="flashcard-face flashcard-back">
+          <div class="fc-label text-success">Antwort</div>
+          <div class="fc-content" id="study-back-text"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Flip button -->
+    <div id="study-flip-area" class="text-center mb-3">
+      <button id="study-flip-btn" class="btn btn-outline-primary btn-lg px-5">
+        <i class="bi bi-eye me-2"></i>Antwort anzeigen
+      </button>
+    </div>
+
+    <!-- Rating buttons (Ampel) -->
+    <div id="study-rate-area" class="d-none">
+      <p class="text-center text-muted small fw-semibold mb-2">Wie gut wusstest du es?</p>
+      <div class="d-flex gap-2">
+        <button id="btn-rate-0" class="btn-rate red">
+          <span class="traffic-dot"></span>
+          <span class="rate-title">Nochmal</span>
+          <span class="rate-sub">Nicht gewusst</span>
+        </button>
+        <button id="btn-rate-1" class="btn-rate yellow">
+          <span class="traffic-dot"></span>
+          <span class="rate-title">Schwer</span>
+          <span class="rate-sub">Teilweise</span>
+        </button>
+        <button id="btn-rate-2" class="btn-rate green">
+          <span class="traffic-dot"></span>
+          <span class="rate-title">Gut</span>
+          <span class="rate-sub">Sicher gewusst</span>
+        </button>
+      </div>
+      <div class="text-center mt-2 text-muted" style="font-size:.7rem;">
+        <kbd>1</kbd> Nochmal &nbsp; <kbd>2</kbd> Schwer &nbsp; <kbd>3</kbd> Gut
+      </div>
+    </div>
+  </div>
+
+  <!-- Finish screen -->
+  <div id="study-finish" class="d-none text-center pt-2">
+    <div class="trophy">🏆</div>
+    <h4 class="mt-2">Sitzung abgeschlossen!</h4>
+    <div class="row g-2 justify-content-center my-3">
+      <div class="col-4"><div class="card bg-danger text-white py-3">
+        <div class="fs-3 fw-bold" id="finish-red">0</div><div class="small">Nochmal</div>
+      </div></div>
+      <div class="col-4"><div class="card bg-warning text-dark py-3">
+        <div class="fs-3 fw-bold" id="finish-yellow">0</div><div class="small">Schwer</div>
+      </div></div>
+      <div class="col-4"><div class="card bg-success text-white py-3">
+        <div class="fs-3 fw-bold" id="finish-green">0</div><div class="small">Gut</div>
+      </div></div>
+    </div>
+    <div class="d-flex gap-2 justify-content-center flex-wrap">
+      <button id="study-restart-btn" class="btn btn-success">
+        <i class="bi bi-arrow-clockwise me-1"></i>Nochmal
+      </button>
+      <button id="study-progress-btn" class="btn btn-outline-primary">
+        <i class="bi bi-bar-chart-line me-1"></i>Fortschritt
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  VIEW: Progress                                                       -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="view-progress" class="view px-3 pt-3">
+  <div class="row g-3 mb-3">
+    <!-- Ring -->
+    <div class="col-5">
+      <div class="card shadow-sm h-100 text-center py-3">
+        <svg viewBox="0 0 120 120" width="100%" height="120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="12"/>
+          <circle id="prog-ring-dash" cx="60" cy="60" r="50" fill="none" stroke="#198754"
+            stroke-width="12" stroke-dasharray="0 314.16" stroke-linecap="round"
+            transform="rotate(-90 60 60)" style="transition:stroke-dasharray .6s ease;"/>
+          <text id="prog-ring-pct" x="60" y="57" text-anchor="middle" font-size="20"
+                font-weight="bold" fill="#212529">0%</text>
+          <text id="prog-ring-label" x="60" y="73" text-anchor="middle" font-size="10"
+                fill="#6c757d">0/0</text>
+        </svg>
+        <div class="small text-muted">Fortschritt</div>
+      </div>
+    </div>
+    <!-- Ampel -->
+    <div class="col-7">
+      <div class="card shadow-sm h-100 p-3">
+        <div class="progress mb-3" style="height:12px;border-radius:8px;overflow:hidden;">
+          <div id="prog-bar-red"    class="progress-bar bg-danger"  style="width:0%;transition:width .5s;"></div>
+          <div id="prog-bar-yellow" class="progress-bar bg-warning" style="width:0%;transition:width .5s;"></div>
+          <div id="prog-bar-green"  class="progress-bar bg-success" style="width:0%;transition:width .5s;"></div>
+        </div>
+        <div class="row g-2 text-center">
+          <div class="col-4">
+            <div id="prog-light-red" class="ampel-light red mb-1"></div>
+            <div class="fw-bold text-danger" id="prog-count-red">0</div>
+            <div style="font-size:.62rem;" class="text-muted">Unbekannt</div>
+          </div>
+          <div class="col-4">
+            <div id="prog-light-yellow" class="ampel-light yellow mb-1"></div>
+            <div class="fw-bold text-warning" id="prog-count-yellow">0</div>
+            <div style="font-size:.62rem;" class="text-muted">In Bearb.</div>
+          </div>
+          <div class="col-4">
+            <div id="prog-light-green" class="ampel-light green mb-1"></div>
+            <div class="fw-bold text-success" id="prog-count-green">0</div>
+            <div style="font-size:.62rem;" class="text-muted">Gelernt</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Path -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header py-2 small fw-semibold">
+      <i class="bi bi-map me-1 text-primary"></i>Lernpfad
+    </div>
+    <div class="card-body py-2">
+      <div class="progress-path" id="prog-path"></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card shadow-sm">
+    <div class="card-header py-2 small fw-semibold">
+      <i class="bi bi-list-ul me-1"></i>Alle Karten
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Vorderseite</th><th>Status</th><th>Serie</th><th>Fällig</th>
+          </tr>
+        </thead>
+        <tbody id="prog-table"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  VIEW: Import / Export                                                -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="view-import" class="view px-3 pt-3">
+
+  <!-- Tab selector -->
+  <ul class="nav nav-pills mb-4" id="import-tabs">
+    <li class="nav-item flex-fill text-center">
+      <button class="nav-link w-100 active" data-tab="csv" onclick="ImportView.switchTab('csv')">
+        CSV
+      </button>
+    </li>
+    <li class="nav-item flex-fill text-center">
+      <button class="nav-link w-100" data-tab="json" onclick="ImportView.switchTab('json')">
+        JSON
+      </button>
+    </li>
+    <li class="nav-item flex-fill text-center">
+      <button class="nav-link w-100" data-tab="apkg" onclick="ImportView.switchTab('apkg')">
+        Anki (.apkg)
+      </button>
+    </li>
+  </ul>
+
+  <!-- CSV Tab -->
+  <div id="import-tab-csv" class="import-tab">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="bi bi-filetype-csv me-2 text-primary"></i>CSV-Datei importieren</h6>
+        <p class="text-muted small mb-3">Jede Zeile enthält eine Karte: <code>Vorderseite,Rückseite</code></p>
+        <label class="btn btn-primary w-100 mb-3" style="cursor:pointer;">
+          <i class="bi bi-folder2-open me-2"></i>Datei auswählen
+          <input type="file" id="csv-file-input" accept=".csv,.txt" class="d-none" onchange="ImportView.loadCSV(this)"/>
+        </label>
+        <div id="csv-preview" class="d-none">
+          <p class="small text-muted mb-2">Deck-Name:</p>
+          <input id="csv-deck-name" type="text" class="form-control mb-2" placeholder="Name für das neue Deck"/>
+          <div id="csv-preview-table" class="mb-3" style="max-height:200px;overflow-y:auto;font-size:.8rem;"></div>
+          <button class="btn btn-success w-100" onclick="ImportView.importCSV()">
+            <i class="bi bi-cloud-download me-2"></i>Importieren
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Export -->
+    <div class="card">
+      <div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="bi bi-upload me-2 text-success"></i>Als CSV exportieren</h6>
+        <p class="text-muted small mb-2">Wähle ein Deck zum Exportieren:</p>
+        <select id="csv-export-deck" class="form-select mb-3"></select>
+        <button class="btn btn-success w-100" onclick="ImportView.exportCSV()">
+          <i class="bi bi-download me-2"></i>CSV herunterladen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JSON Tab -->
+  <div id="import-tab-json" class="import-tab d-none">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="bi bi-filetype-json me-2 text-primary"></i>JSON importieren</h6>
+        <p class="text-muted small mb-3">LernApp-Backup (.json) importieren – inklusive Lernfortschritt.</p>
+        <label class="btn btn-primary w-100" style="cursor:pointer;">
+          <i class="bi bi-folder2-open me-2"></i>JSON-Datei auswählen
+          <input type="file" id="json-file-input" accept=".json" class="d-none" onchange="ImportView.importJSON(this)"/>
+        </label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="bi bi-upload me-2 text-success"></i>Als JSON exportieren</h6>
+        <p class="text-muted small mb-2">Wähle ein Deck:</p>
+        <select id="json-export-deck" class="form-select mb-3"></select>
+        <button class="btn btn-success w-100" onclick="ImportView.exportJSON()">
+          <i class="bi bi-download me-2"></i>JSON herunterladen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anki APKG Tab -->
+  <div id="import-tab-apkg" class="import-tab d-none">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="bi bi-box-seam me-2 text-primary"></i>Anki-Deck importieren</h6>
+        <p class="text-muted small mb-3">Importiere ein Anki-Deck (.apkg). Nur Text-Karten (Vorderseite/Rückseite) werden importiert.</p>
+        <div id="apkg-loading" class="d-none text-center py-3">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="mt-2 text-muted small">Lade Anki-Bibliotheken…</p>
+        </div>
+        <label class="btn btn-primary w-100" style="cursor:pointer;" id="apkg-label">
+          <i class="bi bi-folder2-open me-2"></i>APKG-Datei auswählen
+          <input type="file" id="apkg-file-input" accept=".apkg" class="d-none" onchange="ImportView.loadAPKG(this)"/>
+        </label>
+        <div id="apkg-preview" class="d-none mt-3">
+          <input id="apkg-deck-name" type="text" class="form-control mb-2" placeholder="Deck-Name"/>
+          <div id="apkg-info" class="text-muted small mb-2"></div>
+          <button class="btn btn-success w-100" onclick="ImportView.importAPKG()">
+            <i class="bi bi-cloud-download me-2"></i>Importieren
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-light border-0">
+      <div class="card-body small text-muted">
+        <i class="bi bi-info-circle me-1"></i>
+        Anki-Karten mit HTML-Formatierung werden als Klartext importiert. Medien-Dateien (Bilder, Audio) werden nicht importiert.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FAB ────────────────────────────────────────────────────────────── -->
+<button class="fab d-none" id="fab"><i class="bi bi-plus-lg"></i></button>
+
+<!-- ── Toast ──────────────────────────────────────────────────────────── -->
+<div id="toast" class="toast-msg"></div>
+
+<!-- ── Bottom Navigation ─────────────────────────────────────────────── -->
+<nav class="bottom-nav">
+  <button class="bottom-nav-item active" data-view="decks">
+    <i class="bi bi-collection"></i><span>Decks</span>
+  </button>
+  <button class="bottom-nav-item" data-view="import">
+    <i class="bi bi-box-arrow-in-down"></i><span>Import</span>
+  </button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="./app.js"></script>
+<script src="./import.js"></script>
+</body>
+</html>
