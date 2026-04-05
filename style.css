@@ -1,0 +1,238 @@
+/* ── Base ───────────────────────────────────────────────────────────────── */
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+body {
+  background: #f8f9fa;
+  min-height: 100vh;
+  padding-bottom: calc(72px + var(--safe-bottom)); /* space for bottom nav */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Bottom Navigation (Mobile) ─────────────────────────────────────────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: calc(64px + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: #fff;
+  border-top: 1px solid #dee2e6;
+  display: flex;
+  z-index: 1000;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #6c757d;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 8px 4px;
+  transition: color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item i { font-size: 1.3rem; }
+
+.bottom-nav-item.active { color: #0d6efd; }
+
+/* ── Views ──────────────────────────────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Flashcard 3D Flip ──────────────────────────────────────────────────── */
+.flashcard-scene {
+  width: 100%;
+  height: 220px;
+  perspective: 1000px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.flashcard {
+  width: 100%; height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(.4,0,.2,1);
+  border-radius: 16px;
+}
+
+.flashcard.is-flipped { transform: rotateY(180deg); }
+
+.flashcard-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,.10);
+}
+
+.flashcard-front { background:#fff; border: 2px solid #0d6efd; }
+.flashcard-back  { background:#f0fdf4; border: 2px solid #198754; transform: rotateY(180deg); }
+
+.flashcard-face .fc-label {
+  font-size: .7rem; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: #6c757d; margin-bottom: .6rem;
+}
+
+.flashcard-face .fc-content {
+  font-size: 1.2rem; font-weight: 500; color: #212529; line-height: 1.4;
+}
+
+.flashcard-face .fc-hint {
+  position: absolute; bottom: .75rem;
+  font-size: .72rem; color: #adb5bd;
+}
+
+/* ── Rating Buttons ─────────────────────────────────────────────────────── */
+.btn-rate {
+  flex: 1;
+  padding: .75rem .4rem;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-height: 85px;
+  justify-content: center;
+  border: none;
+  transition: transform .15s, box-shadow .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-rate:active { transform: scale(.95); }
+
+.traffic-dot {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: block;
+}
+
+.btn-rate.red    { background:#dc3545; color:#fff; }
+.btn-rate.yellow { background:#ffc107; color:#212529; }
+.btn-rate.green  { background:#198754; color:#fff; }
+.btn-rate.red    .traffic-dot { background:#ff8c8c; box-shadow:0 0 8px #ff8c8c; }
+.btn-rate.yellow .traffic-dot { background:#ffe066; box-shadow:0 0 8px #ffe066; }
+.btn-rate.green  .traffic-dot { background:#69db7c; box-shadow:0 0 8px #69db7c; }
+
+.btn-rate .rate-title { font-size: .85rem; font-weight: 700; }
+.btn-rate .rate-sub   { font-size: .65rem; opacity: .8; }
+
+/* ── Ampel Lights ───────────────────────────────────────────────────────── */
+.ampel-light {
+  width: 26px; height: 26px; border-radius: 50%;
+  margin: 0 auto; background: #dee2e6;
+  transition: background .3s, box-shadow .3s;
+}
+.ampel-light.red.on    { background:#dc3545; box-shadow:0 0 12px rgba(220,53,69,.6); }
+.ampel-light.yellow.on { background:#ffc107; box-shadow:0 0 12px rgba(255,193,7,.6); }
+.ampel-light.green.on  { background:#198754; box-shadow:0 0 12px rgba(25,135,84,.6); }
+
+/* ── Progress Path ──────────────────────────────────────────────────────── */
+.progress-path {
+  display: flex; flex-wrap: wrap; gap: 10px; padding: 4px 0;
+}
+
+.path-node {
+  display: flex; flex-direction: column; align-items: center; width: 64px;
+}
+
+.path-dot { font-size: 1.5rem; transition: transform .2s; }
+.path-node:hover .path-dot { transform: scale(1.25); }
+.path-label { font-size: .62rem; color: #6c757d; text-align: center; max-width: 64px; margin-top: 3px; }
+
+/* ── Deck Cards ─────────────────────────────────────────────────────────── */
+.deck-card {
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  border-radius: 14px !important;
+}
+.deck-card:active { transform: scale(.97); }
+
+/* ── Finish Trophy ──────────────────────────────────────────────────────── */
+.trophy { font-size: 3.5rem; animation: bounce .6s ease; }
+@keyframes bounce {
+  0%,100% { transform:translateY(0); }
+  40%      { transform:translateY(-16px); }
+  60%      { transform:translateY(-7px); }
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.app-header {
+  position: sticky; top: 0; z-index: 100;
+  background: #0d6efd;
+  padding: .75rem 1rem;
+  display: flex; align-items: center; gap: .75rem;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.app-header h1 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.app-header .back-btn {
+  background: none; border: none; color: #fff;
+  font-size: 1.3rem; padding: 0; cursor: pointer;
+}
+
+/* ── Cards border-left status ───────────────────────────────────────────── */
+.card-status-0 { border-left: 4px solid #dc3545 !important; }
+.card-status-1 { border-left: 4px solid #ffc107 !important; }
+.card-status-2 { border-left: 4px solid #198754 !important; }
+
+/* ── Misc ───────────────────────────────────────────────────────────────── */
+.fab {
+  position: fixed; bottom: calc(76px + var(--safe-bottom)); right: 1.25rem;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #0d6efd; color: #fff;
+  border: none; font-size: 1.5rem;
+  box-shadow: 0 4px 16px rgba(13,110,253,.4);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 500;
+  transition: transform .15s, box-shadow .15s;
+}
+.fab:active { transform: scale(.92); }
+
+.empty-state { text-align: center; padding: 3rem 1rem; }
+.empty-state i { font-size: 3.5rem; color: #dee2e6; }
+
+.badge-status-0 { background: rgba(220,53,69,.12); color: #b02a37; border: 1px solid rgba(220,53,69,.3); }
+.badge-status-1 { background: rgba(255,193,7,.15); color: #997404; border: 1px solid rgba(255,193,7,.4); }
+.badge-status-2 { background: rgba(25,135,84,.12); color: #146c43; border: 1px solid rgba(25,135,84,.3); }
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+.toast-msg {
+  position: fixed;
+  bottom: calc(80px + var(--safe-bottom));
+  left: 50%; transform: translateX(-50%) translateY(20px);
+  background: rgba(33,37,41,.92);
+  color: #fff;
+  padding: .6rem 1.2rem;
+  border-radius: 24px;
+  font-size: .85rem;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity .25s, transform .25s;
+  pointer-events: none;
+  z-index: 9999;
+}
+.toast-msg.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Import tabs ────────────────────────────────────────────────────────── */
+#import-tabs .nav-link { border-radius: 8px; font-size: .85rem; font-weight: 600; }
