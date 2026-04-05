@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, date, timedelta
+import json
+import random
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'lernapp-secret-key'
@@ -8,6 +10,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///lernapp.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# Status constants
+STATUS_RED    = 0  # Unbekannt
+STATUS_YELLOW = 1  # In Bearbeitung
+STATUS_GREEN  = 2  # Gelernt
 
 
 class Deck(db.Model):
@@ -21,6 +28,34 @@ class Deck(db.Model):
     def card_count(self):
         return len(self.cards)
 
+    @property
+    def red_count(self):
+        return sum(1 for c in self.cards if c.status == STATUS_RED)
+
+    @property
+    def yellow_count(self):
+        return sum(1 for c in self.cards if c.status == STATUS_YELLOW)
+
+    @property
+    def green_count(self):
+        return sum(1 for c in self.cards if c.status == STATUS_GREEN)
+
+    @property
+    def progress_pct(self):
+        if not self.cards:
+            return 0
+        return round((self.green_count / len(self.cards)) * 100)
+
+    def due_cards(self):
+        """Returns cards sorted by priority: red first, then yellow, then green.
+        Within each group, cards not reviewed today come first."""
+        today = date.today()
+        def sort_key(c):
+            last = c.last_reviewed.date() if c.last_reviewed else date(2000, 1, 1)
+            reviewed_today = (last == today)
+            return (c.status, reviewed_today, last)
+        return sorted(self.cards, key=sort_key)
+
 
 class Card(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -28,6 +63,25 @@ class Card(db.Model):
     back = db.Column(db.Text, nullable=False)
     deck_id = db.Column(db.Integer, db.ForeignKey('deck.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Spaced repetition fields
+    status = db.Column(db.Integer, default=STATUS_RED, nullable=False)  # 0/1/2
+    correct_streak = db.Column(db.Integer, default=0, nullable=False)
+    total_reviews = db.Column(db.Integer, default=0, nullable=False)
+    last_reviewed = db.Column(db.DateTime, nullable=True)
+    interval_days = db.Column(db.Float, default=1.0, nullable=False)  # SM-2 interval
+
+    @property
+    def status_label(self):
+        return ['Unbekannt', 'In Bearbeitung', 'Gelernt'][self.status]
+
+    @property
+    def status_color(self):
+        return ['danger', 'warning', 'success'][self.status]
+
+    @property
+    def status_icon(self):
+        return ['circle-fill', 'circle-fill', 'circle-fill'][self.status]
 
 
 # ── Decks ──────────────────────────────────────────────────────────────────────
@@ -136,11 +190,57 @@ def delete_card(deck_id, card_id):
 @app.route('/deck/<int:deck_id>/study')
 def study(deck_id):
     deck = db.get_or_404(Deck, deck_id)
-    cards = deck.cards
-    if not cards:
+    if not deck.cards:
         flash('Dieses Deck hat noch keine Karten.', 'warning')
         return redirect(url_for('deck_detail', deck_id=deck.id))
-    return render_template('study.html', deck=deck, cards=cards)
+    cards = deck.due_cards()
+    cards_data = [{'id': c.id, 'front': c.front, 'back': c.back, 'status': c.status} for c in cards]
+    return render_template('study.html', deck=deck, cards_data=json.dumps(cards_data))
+
+
+@app.route('/deck/<int:deck_id>/card/<int:card_id>/rate', methods=['POST'])
+def rate_card(deck_id, card_id):
+    """AJAX endpoint: rate a card as 0=red, 1=yellow, 2=green."""
+    card = db.get_or_404(Card, card_id)
+    rating = int(request.json.get('rating', 0))  # 0, 1, 2
+
+    card.total_reviews += 1
+    card.last_reviewed = datetime.utcnow()
+
+    if rating == STATUS_GREEN:
+        card.correct_streak += 1
+        # SM-2 inspired: increase interval
+        if card.status < STATUS_GREEN:
+            card.status += 1
+        if card.correct_streak == 1:
+            card.interval_days = 1.0
+        elif card.correct_streak == 2:
+            card.interval_days = 3.0
+        else:
+            card.interval_days = round(card.interval_days * 2.1, 1)
+    elif rating == STATUS_YELLOW:
+        card.correct_streak = max(0, card.correct_streak - 1)
+        card.interval_days = max(1.0, card.interval_days * 0.5)
+        if card.status == STATUS_RED:
+            card.status = STATUS_YELLOW
+        # yellow keeps current status otherwise
+    else:  # red
+        card.correct_streak = 0
+        card.interval_days = 1.0
+        card.status = STATUS_RED
+
+    db.session.commit()
+    return jsonify({
+        'status': card.status,
+        'interval_days': card.interval_days,
+        'correct_streak': card.correct_streak,
+    })
+
+
+@app.route('/deck/<int:deck_id>/progress')
+def progress(deck_id):
+    deck = db.get_or_404(Deck, deck_id)
+    return render_template('progress.html', deck=deck)
 
 
 if __name__ == '__main__':

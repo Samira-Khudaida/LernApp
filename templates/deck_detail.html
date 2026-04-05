@@ -20,6 +20,9 @@
     <a href="{{ url_for('study', deck_id=deck.id) }}" class="btn btn-success">
       <i class="bi bi-play-circle me-1"></i>Lernen starten
     </a>
+    <a href="{{ url_for('progress', deck_id=deck.id) }}" class="btn btn-outline-primary">
+      <i class="bi bi-bar-chart-line me-1"></i>Fortschritt
+    </a>
     {% endif %}
     <a href="{{ url_for('new_card', deck_id=deck.id) }}" class="btn btn-primary">
       <i class="bi bi-plus-lg me-1"></i>Karte hinzufügen
@@ -45,34 +48,60 @@
   </div>
 </div>
 
-<!-- Stats -->
-<div class="row g-3 mb-4">
-  <div class="col-auto">
-    <div class="card bg-primary text-white px-4 py-3 shadow-sm">
-      <div class="fs-2 fw-bold">{{ deck.card_count }}</div>
-      <div class="small">Karte{{ 'n' if deck.card_count != 1 else '' }}</div>
+<!-- Ampel Stats -->
+{% if deck.card_count > 0 %}
+<div class="card shadow-sm mb-4 p-3">
+  <div class="row g-3 align-items-center">
+    <div class="col-md-6">
+      <div class="progress mb-2" style="height:14px; border-radius:8px; overflow:hidden;">
+        <div class="progress-bar bg-danger"
+             style="width:{{ (deck.red_count/deck.card_count*100)|round }}%"></div>
+        <div class="progress-bar bg-warning"
+             style="width:{{ (deck.yellow_count/deck.card_count*100)|round }}%"></div>
+        <div class="progress-bar bg-success"
+             style="width:{{ (deck.green_count/deck.card_count*100)|round }}%"></div>
+      </div>
+      <div class="d-flex gap-3 small">
+        <span class="text-danger fw-semibold"><i class="bi bi-circle-fill me-1" style="font-size:.55rem;"></i>{{ deck.red_count }} Unbekannt</span>
+        <span class="text-warning fw-semibold"><i class="bi bi-circle-fill me-1" style="font-size:.55rem;"></i>{{ deck.yellow_count }} In Bearbeitung</span>
+        <span class="text-success fw-semibold"><i class="bi bi-circle-fill me-1" style="font-size:.55rem;"></i>{{ deck.green_count }} Gelernt</span>
+      </div>
+    </div>
+    <div class="col-md-3 text-center">
+      <div class="fs-4 fw-bold text-success">{{ deck.progress_pct }}%</div>
+      <div class="small text-muted">Fortschritt</div>
+    </div>
+    <div class="col-md-3 text-center">
+      <div class="fs-4 fw-bold">{{ deck.card_count }}</div>
+      <div class="small text-muted">Karten gesamt</div>
     </div>
   </div>
 </div>
+{% endif %}
 
 <!-- Cards list -->
 {% if deck.cards %}
 <div class="row row-cols-1 row-cols-md-2 g-3">
   {% for card in deck.cards %}
+  {% set color = ['danger', 'warning', 'success'][card.status] %}
   <div class="col">
-    <div class="card shadow-sm h-100 card-item">
+    <div class="card shadow-sm h-100 card-item border-start border-{{ color }} border-3">
       <div class="card-body">
-        <div class="mb-2">
-          <span class="badge bg-primary-subtle text-primary-emphasis mb-1">Vorderseite</span>
-          <p class="mb-0 fw-semibold">{{ card.front }}</p>
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <span class="badge bg-primary-subtle text-primary-emphasis">Vorderseite</span>
+          <span class="badge bg-{{ color }}-subtle text-{{ color }}-emphasis border border-{{ color }}">
+            <i class="bi bi-circle-fill me-1" style="font-size:.5rem;"></i>{{ card.status_label }}
+          </span>
         </div>
+        <p class="mb-2 fw-semibold">{{ card.front }}</p>
         <hr class="my-2">
-        <div>
-          <span class="badge bg-success-subtle text-success-emphasis mb-1">Rückseite</span>
-          <p class="mb-0 text-muted">{{ card.back }}</p>
-        </div>
+        <span class="badge bg-success-subtle text-success-emphasis mb-1">Rückseite</span>
+        <p class="mb-0 text-muted">{{ card.back }}</p>
       </div>
-      <div class="card-footer bg-transparent d-flex gap-2 justify-content-end">
+      <div class="card-footer bg-transparent d-flex gap-2 justify-content-end align-items-center">
+        {% if card.correct_streak > 0 %}
+          <small class="text-muted me-auto">🔥 {{ card.correct_streak }}er Serie</small>
+        {% endif %}
         <a href="{{ url_for('edit_card', deck_id=deck.id, card_id=card.id) }}"
            class="btn btn-sm btn-outline-secondary">
           <i class="bi bi-pencil"></i>
