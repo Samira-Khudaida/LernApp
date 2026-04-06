@@ -360,7 +360,7 @@ const App = {
 
     // wire up buttons
     document.getElementById('study-flip-btn').onclick = () => this._flipCard();
-    document.getElementById('study-flashcard').onclick = () => { if (!st.flipped) this._flipCard(); };
+    document.getElementById('flashcard-inner').onclick = () => { if (!st.flipped) this._flipCard(); };
     document.getElementById('btn-rate-0').onclick = () => this._rate(0);
     document.getElementById('btn-rate-1').onclick = () => this._rate(1);
     document.getElementById('btn-rate-2').onclick = () => this._rate(2);
@@ -375,6 +375,7 @@ const App = {
 
   _showStudyCard() {
     const { cards, idx, ratings } = this._study;
+    if (!cards.length) return;
     const card = cards[idx];
     const total = cards.length;
 
