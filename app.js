@@ -459,44 +459,101 @@ const App = {
     const cards = DB.cardsForDeck(deckId);
     const s     = deckStats(deck);
 
-    // SVG ring
+    // ── SVG ring ────────────────────────────────────────────────────────
     const circ = 314.16;
-    const dash  = s.total ? ((s.green / s.total) * circ).toFixed(1) : 0;
+    const dash = s.total ? ((s.green / s.total) * circ).toFixed(1) : 0;
     document.getElementById('prog-ring-dash').setAttribute('stroke-dasharray', `${dash} ${circ}`);
-    document.getElementById('prog-ring-pct').textContent  = s.pct + '%';
-    document.getElementById('prog-ring-label').textContent = `${s.green}/${s.total}`;
+    document.getElementById('prog-ring-pct').textContent   = s.pct + '%';
+    document.getElementById('prog-ring-label').textContent = `${s.green}/${s.total} gelernt`;
+    document.getElementById('prog-count-red-sm').textContent    = s.red    + ' ●';
+    document.getElementById('prog-count-yellow-sm').textContent = s.yellow + ' ●';
+    document.getElementById('prog-count-green-sm').textContent  = s.green  + ' ●';
 
-    // Stacked bar
+    // ── Real Traffic Light ───────────────────────────────────────────────
+    // Light state based on overall progress
+    const rl = document.getElementById('tl-red');
+    const yl = document.getElementById('tl-yellow');
+    const gl = document.getElementById('tl-green');
+    const lb = document.getElementById('tl-label');
+    rl.className = 'tl-light tl-red';
+    yl.className = 'tl-light tl-yellow';
+    gl.className = 'tl-light tl-green';
+    if (s.pct >= 80) {
+      gl.classList.add('on'); lb.textContent = 'Super!';
+    } else if (s.pct >= 40) {
+      yl.classList.add('on'); lb.textContent = 'Weiter so!';
+    } else {
+      rl.classList.add('on'); lb.textContent = 'Los geht\'s!';
+    }
+
+    // ── Stacked bar + ampel lights ───────────────────────────────────────
     const rw = s.total ? (s.red/s.total*100).toFixed(0) : 0;
     const yw = s.total ? (s.yellow/s.total*100).toFixed(0) : 0;
     const gw = s.total ? (s.green/s.total*100).toFixed(0) : 0;
     document.getElementById('prog-bar-red').style.width    = rw + '%';
     document.getElementById('prog-bar-yellow').style.width = yw + '%';
     document.getElementById('prog-bar-green').style.width  = gw + '%';
-
-    // Ampel lights
-    document.getElementById('prog-light-red').className    = `ampel-light red    ${s.red > 0 ? 'on' : ''}`;
+    document.getElementById('prog-light-red').className    = `ampel-light red    ${s.red    > 0 ? 'on' : ''}`;
     document.getElementById('prog-light-yellow').className = `ampel-light yellow ${s.yellow > 0 ? 'on' : ''}`;
-    document.getElementById('prog-light-green').className  = `ampel-light green  ${s.green > 0 ? 'on' : ''}`;
+    document.getElementById('prog-light-green').className  = `ampel-light green  ${s.green  > 0 ? 'on' : ''}`;
     document.getElementById('prog-count-red').textContent    = s.red;
     document.getElementById('prog-count-yellow').textContent = s.yellow;
     document.getElementById('prog-count-green').textContent  = s.green;
 
-    // Path
-    const icons  = ['x-circle-fill','dash-circle-fill','check-circle-fill'];
-    const colors = ['text-danger','text-warning','text-success'];
-    document.getElementById('prog-path').innerHTML = cards.map(c => `
-      <div class="path-node" title="${esc(c.front)}">
-        <div class="path-dot ${colors[c.status]}"><i class="bi bi-${icons[c.status]}"></i></div>
-        <div class="path-label">${esc(c.front.slice(0,18))}${c.front.length > 18 ? '…' : ''}</div>
-      </div>`).join('');
+    // ── Segmented Lernpfad Track ─────────────────────────────────────────
+    const SECTION = 8;   // cards per section
+    const sections = [];
+    for (let i = 0; i < cards.length; i += SECTION) {
+      sections.push(cards.slice(i, i + SECTION));
+    }
+    if (!sections.length) sections.push([]);
 
-    // Table
+    document.getElementById('prog-track-subtitle').textContent =
+      `${sections.length} Abschnitt${sections.length !== 1 ? 'e' : ''} · ${s.total} Karten`;
+
+    // A section is "unlocked" if the PREVIOUS section is ≥ 70 % green
+    const sectionGreenPct = sections.map(sec => {
+      if (!sec.length) return 0;
+      return Math.round(sec.filter(c => c.status === 2).length / sec.length * 100);
+    });
+
+    const dotColor = ['#dc3545', '#ffc107', '#198754'];   // red/yellow/green
+    const dotColorNew = '#dee2e6';                          // grey = never reviewed
+
+    document.getElementById('lernpfad-track').innerHTML = sections.map((sec, idx) => {
+      const unlocked = idx === 0 || sectionGreenPct[idx - 1] >= 70;
+      const secGreen = sectionGreenPct[idx];
+      // Section header color
+      const hdrClass = secGreen >= 70 ? 'section-done'
+                     : secGreen >= 30 ? 'section-progress'
+                     : idx > 0 && !unlocked ? 'section-locked'
+                     : 'section-new';
+
+      const dots = sec.map(c => {
+        const col = c.totalReviews === 0 ? dotColorNew : dotColor[c.status];
+        return `<span class="card-dot" style="background:${col};" title="${esc(c.front)}"></span>`;
+      }).join('');
+
+      const lockIcon = !unlocked
+        ? '<i class="bi bi-lock-fill tl-lock-icon"></i>'
+        : '';
+
+      return `
+        <div class="lernpfad-section ${hdrClass}${!unlocked ? ' locked' : ''}">
+          <div class="section-num">${idx + 1}.</div>
+          <div class="section-dots">${dots}${lockIcon}</div>
+          <div class="section-pct">${unlocked ? secGreen + '%' : ''}</div>
+        </div>`;
+    }).join('');
+
+    // ── Table ────────────────────────────────────────────────────────────
     const labels = ['Unbekannt','In Bearbeitung','Gelernt'];
     document.getElementById('prog-table').innerHTML = cards.map(c => {
-      const nextRev = c.totalReviews === 0 ? '<span class="badge bg-secondary">Neu</span>'
-                    : c.status === 2 ? `in ${Math.ceil(c.intervalDays)} Tag${c.intervalDays >= 2 ? 'en' : ''}`
-                    : 'Heute';
+      const nextRev = c.totalReviews === 0
+        ? '<span class="badge bg-secondary">Neu</span>'
+        : c.status === 2
+          ? `in ${Math.ceil(c.intervalDays)} Tag${c.intervalDays >= 2 ? 'en' : ''}`
+          : 'Heute';
       return `<tr>
         <td class="small">${esc(c.front)}</td>
         <td><span class="badge badge-status-${c.status}">${labels[c.status]}</span></td>
