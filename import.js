@@ -1,6 +1,109 @@
 // ── Import / Export View ─────────────────────────────────────────────────────
 const ImportView = {
   _apkgCards: null,
+  _urlImportData: null,
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  QR-Code / URL Sharing
+  // ══════════════════════════════════════════════════════════════════════════
+
+  showShareModal(deckId) {
+    const deck  = DB.getDeck(deckId);
+    const cards = DB.cardsForDeck(deckId);
+
+    // Compress deck + cards into URL hash
+    const payload = JSON.stringify({ deck, cards });
+    const compressed = LZString.compressToEncodedURIComponent(payload);
+    const url = `${location.origin}${location.pathname}#d=${compressed}`;
+
+    // Show URL in input
+    document.getElementById('share-url-input').value = url;
+    this._currentShareUrl = url;
+
+    // Render QR code
+    const canvas = document.getElementById('share-qr-canvas');
+    QRCode.toCanvas(canvas, url, {
+      width: 220,
+      margin: 2,
+      color: { dark: '#212529', light: '#ffffff' },
+    }).catch(err => {
+      // URL might be too long for QR → show warning
+      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+      canvas.width = 220; canvas.height = 60;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#dc3545';
+      ctx.font = '13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Deck zu groß für QR-Code.', 110, 25);
+      ctx.fillText('Bitte Link kopieren.', 110, 45);
+    });
+
+    new bootstrap.Modal(document.getElementById('shareModal')).show();
+  },
+
+  copyShareUrl() {
+    const input = document.getElementById('share-url-input');
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(input.value).then(() => showToast('Link kopiert!'));
+    } else {
+      input.select(); document.execCommand('copy');
+      showToast('Link kopiert!');
+    }
+  },
+
+  nativeShare() {
+    const url = document.getElementById('share-url-input').value;
+    if (navigator.share) {
+      navigator.share({ title: 'LernApp Deck', url }).catch(() => {});
+    } else {
+      this.copyShareUrl();
+    }
+  },
+
+  // ── Called on app start when #d= hash is detected ─────────────────────
+  detectURLImport(compressed) {
+    try {
+      const json = LZString.decompressFromEncodedURIComponent(compressed);
+      if (!json) return;
+      const data = JSON.parse(json);
+      if (!data.deck || !data.cards) return;
+
+      this._urlImportData = data;
+
+      const banner = document.getElementById('import-banner');
+      document.getElementById('import-banner-name').textContent =
+        `„${data.deck.name}" – ${data.cards.length} Karte${data.cards.length !== 1 ? 'n' : ''}`;
+      banner.classList.remove('d-none');
+
+      // Adjust body padding for banner
+      document.body.style.paddingTop = '120px';
+    } catch {
+      // Invalid hash – ignore
+    }
+  },
+
+  confirmURLImport() {
+    const data = this._urlImportData;
+    if (!data) return;
+    const deck = { ...data.deck, id: uid() };
+    DB.saveDeck(deck);
+    data.cards.forEach(c => DB.saveCard({ ...c, id: uid(), deckId: deck.id,
+      status: 0, correctStreak: 0, totalReviews: 0, lastReviewed: null, intervalDays: 1 }));
+
+    this.dismissURLImport();
+    showToast(`✓ „${deck.name}" mit ${data.cards.length} Karten importiert!`);
+    App.go('decks');
+
+    // Clear hash from URL
+    history.replaceState(null, '', location.pathname);
+  },
+
+  dismissURLImport() {
+    document.getElementById('import-banner').classList.add('d-none');
+    document.body.style.paddingTop = '';
+    this._urlImportData = null;
+    history.replaceState(null, '', location.pathname);
+  },
 
   // ── Tab switching ──────────────────────────────────────────────────────────
   switchTab(tab) {

@@ -207,6 +207,8 @@ const App = {
       () => App.go('progress', { deckId });
     document.getElementById('detail-edit-btn').onclick =
       () => App.go('editDeck', { deckId });
+    document.getElementById('detail-share-btn').onclick =
+      () => ImportView.showShareModal(deckId);
     document.getElementById('detail-export-csv-btn').onclick =
       () => { ImportView._refreshDeckSelects(); ImportView.exportCSVById(deckId); };
     document.getElementById('detail-export-json-btn').onclick =
@@ -598,6 +600,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Service Worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+
+  // Check for shared deck in URL hash (#d=...)
+  const hash = location.hash;
+  if (hash.startsWith('#d=')) {
+    ImportView.detectURLImport(hash.slice(3));
   }
 
   App.go('decks');
