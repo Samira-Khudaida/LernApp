@@ -161,7 +161,7 @@ const App = {
 
     const titles = {
       decks:    '<i class="bi bi-stack me-2"></i>LernApp',
-      import:   '<i class="bi bi-box-arrow-in-down me-2"></i>Import / Export',
+      import:   '<i class="bi bi-stack me-2"></i>LernApp',
       detail:   DB.getDeck(state.deckId)?.name || 'Deck',
       newDeck:  'Neues Deck',
       editDeck: 'Deck bearbeiten',
