@@ -1,8 +1,55 @@
-// ── Storage ─────────────────────────────────────────────────────────────────
+// ── Storage (localStorage + IndexedDB backup) ────────────────────────────────
 const DB = {
-  get decks()  { return JSON.parse(localStorage.getItem('la_decks')  || '[]'); },
-  get cards()  { return JSON.parse(localStorage.getItem('la_cards')  || '[]'); },
-  save(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+  // ── IndexedDB setup ────────────────────────────────────────────────────
+  _idb: null,
+
+  async _openIDB() {
+    if (this._idb) return this._idb;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('lernapp_v1', 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore('kv');
+      req.onsuccess  = e => { this._idb = e.target.result; resolve(this._idb); };
+      req.onerror    = () => reject(req.error);
+    });
+  },
+
+  async _idbPut(key, val) {
+    try {
+      const db = await this._openIDB();
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(val, key);
+    } catch { /* silently ignore – localStorage is still the primary store */ }
+  },
+
+  async _idbGet(key) {
+    try {
+      const db = await this._openIDB();
+      return await new Promise(res => {
+        const req = db.transaction('kv').objectStore('kv').get(key);
+        req.onsuccess = () => res(req.result ?? null);
+        req.onerror   = () => res(null);
+      });
+    } catch { return null; }
+  },
+
+  // Called once on startup – restores localStorage from IDB if it was wiped
+  async restoreIfNeeded() {
+    for (const key of ['la_decks', 'la_cards']) {
+      if (!localStorage.getItem(key)) {
+        const val = await this._idbGet(key);
+        if (val) localStorage.setItem(key, JSON.stringify(val));
+      }
+    }
+  },
+
+  // ── Public API (synchronous, same interface as before) ──────────────────
+  get decks() { return JSON.parse(localStorage.getItem('la_decks') || '[]'); },
+  get cards() { return JSON.parse(localStorage.getItem('la_cards') || '[]'); },
+
+  save(key, val) {
+    localStorage.setItem(key, JSON.stringify(val));
+    this._idbPut(key, val); // async fire-and-forget backup
+  },
 
   saveDeck(deck) {
     const decks = this.decks;
@@ -23,11 +70,9 @@ const DB = {
   deleteCard(id) {
     this.save('la_cards', this.cards.filter(c => c.id !== id));
   },
-  cardsForDeck(deckId) {
-    return this.cards.filter(c => c.deckId === deckId);
-  },
-  getDeck(id)  { return this.decks.find(d => d.id === id); },
-  getCard(id)  { return this.cards.find(c => c.id === id); },
+  cardsForDeck(deckId) { return this.cards.filter(c => c.deckId === deckId); },
+  getDeck(id) { return this.decks.find(d => d.id === id); },
+  getCard(id) { return this.cards.find(c => c.id === id); },
 };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -140,7 +185,7 @@ const App = {
 
   render_import() {
     document.getElementById('fab').style.display = 'none';
-    ImportView.switchTab('sync');
+    ImportView.switchTab('csv');
     ImportView._refreshDeckSelects();
   },
 
@@ -592,7 +637,10 @@ function esc(str) {
 }
 
 // ── Boot ────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Restore from IndexedDB if localStorage was cleared
+  await DB.restoreIfNeeded();
+
   // Bottom nav
   document.querySelectorAll('.bottom-nav-item').forEach(btn => {
     btn.addEventListener('click', () => App.go(btn.dataset.view));
