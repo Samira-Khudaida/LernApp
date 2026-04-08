@@ -140,6 +140,7 @@ const App = {
 
   render_import() {
     document.getElementById('fab').style.display = 'none';
+    ImportView.switchTab('sync');
     ImportView._refreshDeckSelects();
   },
 
@@ -602,9 +603,9 @@ document.addEventListener('DOMContentLoaded', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 
-  // Check for shared deck in URL hash (#d=...)
+  // Check for shared deck in URL hash (#g=GIST_ID)
   const hash = location.hash;
-  if (hash.startsWith('#d=')) {
+  if (hash.startsWith('#g=')) {
     ImportView.detectURLImport(hash.slice(3));
   }
 

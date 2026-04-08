@@ -392,7 +392,12 @@
   <!-- Tab selector -->
   <ul class="nav nav-pills mb-4" id="import-tabs">
     <li class="nav-item flex-fill text-center">
-      <button class="nav-link w-100 active" data-tab="csv" onclick="ImportView.switchTab('csv')">
+      <button class="nav-link w-100 active" data-tab="sync" onclick="ImportView.switchTab('sync')">
+        <i class="bi bi-qr-code me-1"></i>Sync
+      </button>
+    </li>
+    <li class="nav-item flex-fill text-center">
+      <button class="nav-link w-100" data-tab="csv" onclick="ImportView.switchTab('csv')">
         CSV
       </button>
     </li>
@@ -403,13 +408,57 @@
     </li>
     <li class="nav-item flex-fill text-center">
       <button class="nav-link w-100" data-tab="apkg" onclick="ImportView.switchTab('apkg')">
-        Anki (.apkg)
+        Anki
       </button>
     </li>
   </ul>
 
+  <!-- Sync Tab (default) -->
+  <div id="import-tab-sync" class="import-tab">
+    <!-- Import via Sync-Code -->
+    <div class="card mb-3 border-primary">
+      <div class="card-body">
+        <h6 class="fw-bold mb-1">
+          <i class="bi bi-phone me-2 text-primary"></i>Deck vom anderen Gerät importieren
+        </h6>
+        <p class="text-muted small mb-3">
+          Öffne auf dem <strong>anderen Gerät</strong> das Deck → ⋯ → <em>Per QR-Code teilen</em>.<br>
+          Scanne den QR-Code <strong>oder</strong> gib den Sync-Code hier ein:
+        </p>
+        <div class="input-group mb-2">
+          <input id="sync-code-input" type="text" class="form-control"
+                 placeholder="Sync-Code oder Link einfügen"
+                 style="font-family:monospace; letter-spacing:.05em;"/>
+          <button id="sync-code-btn" class="btn btn-primary" onclick="ImportView.importFromCode()">
+            Importieren
+          </button>
+        </div>
+        <p class="text-muted" style="font-size:.7rem;">
+          <i class="bi bi-info-circle me-1"></i>
+          Der Code steht im QR-Dialog unter dem QR-Bild.
+        </p>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="card bg-light border-0">
+      <div class="card-body small">
+        <p class="fw-semibold mb-2"><i class="bi bi-arrow-left-right me-1 text-primary"></i>So funktioniert die Geräte-Synchronisation</p>
+        <ol class="ps-3 mb-0 text-muted">
+          <li class="mb-1">Desktop: Deck öffnen → <strong>⋯ → Per QR-Code teilen</strong></li>
+          <li class="mb-1">QR-Code mit Kamera-App scannen <em>oder</em> Code hier eingeben</li>
+          <li>Deck erscheint auf dem Handy ✓</li>
+        </ol>
+        <p class="mt-2 mb-0 text-muted">
+          <i class="bi bi-cloud-check me-1 text-success"></i>
+          Daten werden auf GitHub gespeichert – kein Account nötig.
+        </p>
+      </div>
+    </div>
+  </div>
+
   <!-- CSV Tab -->
-  <div id="import-tab-csv" class="import-tab">
+  <div id="import-tab-csv" class="import-tab d-none">
     <div class="card mb-3">
       <div class="card-body">
         <h6 class="fw-bold mb-1"><i class="bi bi-filetype-csv me-2 text-primary"></i>CSV-Datei importieren</h6>
@@ -507,35 +556,49 @@
 <div class="modal fade" id="shareModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header border-0 pb-0">
+      <div class="modal-header border-0 pb-1">
         <h5 class="modal-title fw-bold">
           <i class="bi bi-qr-code me-2 text-primary"></i>Deck teilen
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body text-center pt-2">
-        <p class="text-muted small mb-3">
-          Scanne den QR-Code mit dem <strong>iPhone</strong> (Kamera-App) –<br>
-          das Deck wird automatisch importiert.
+      <div class="modal-body text-center pt-1">
+        <p class="text-muted small mb-2">
+          Scanne den QR-Code auf dem Handy (Kamera-App).<br>
+          Das Deck wird automatisch importiert.
         </p>
-        <div class="d-flex justify-content-center mb-3">
-          <canvas id="share-qr-canvas" style="border-radius:12px;"></canvas>
+
+        <!-- QR image -->
+        <div class="d-flex justify-content-center mb-3" id="share-qr-wrap">
+          <div class="d-flex align-items-center justify-content-center" style="height:220px;">
+            <div class="spinner-border text-primary"></div>
+          </div>
         </div>
+
+        <!-- Short code -->
+        <div class="mb-3 p-2 bg-light rounded">
+          <div class="text-muted small mb-1">Sync-Code (alternativ manuell eingeben)</div>
+          <div id="share-code-box" class="fw-bold fs-5 letter-spacing-2" style="font-family:monospace;letter-spacing:.15em;">—</div>
+        </div>
+
+        <!-- Copy URL -->
         <div class="input-group input-group-sm mb-3">
           <input id="share-url-input" type="text" class="form-control" readonly
-                 style="font-size:.7rem;"/>
+                 style="font-size:.68rem;"/>
           <button class="btn btn-outline-secondary" onclick="ImportView.copyShareUrl()" title="Kopieren">
             <i class="bi bi-clipboard"></i>
           </button>
         </div>
+
+        <!-- Native share -->
         <div class="d-grid">
           <button class="btn btn-primary" onclick="ImportView.nativeShare()">
-            <i class="bi bi-share me-2"></i>Link teilen (WhatsApp, etc.)
+            <i class="bi bi-share me-2"></i>Link teilen (WhatsApp, Mail…)
           </button>
         </div>
-        <p class="text-muted mt-3 mb-0" style="font-size:.7rem;">
-          <i class="bi bi-info-circle me-1"></i>
-          Der Link enthält alle Kartendaten – kein Account nötig.
+        <p class="text-muted mt-2 mb-0" style="font-size:.68rem;">
+          <i class="bi bi-cloud me-1"></i>
+          Deck wird sicher auf GitHub gespeichert – kein Account nötig.
         </p>
       </div>
     </div>
@@ -570,8 +633,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="./app.js"></script>
 <script src="./import.js"></script>
 </body>

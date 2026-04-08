@@ -1,4 +1,4 @@
-const CACHE = 'lernapp-v3';
+const CACHE = 'lernapp-v4';
 const ASSETS = [
   './index.html',
   './app.js',
@@ -10,8 +10,6 @@ const ASSETS = [
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
-  'https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js',
-  'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
 ];
 
 self.addEventListener('install', e => {

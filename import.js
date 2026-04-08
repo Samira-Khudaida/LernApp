@@ -2,84 +2,116 @@
 const ImportView = {
   _apkgCards: null,
   _urlImportData: null,
+  _currentShareUrl: null,
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  QR-Code / URL Sharing
+  //  QR-Code / Gist Sharing  (kein CDN nötig)
   // ══════════════════════════════════════════════════════════════════════════
 
-  showShareModal(deckId) {
+  async showShareModal(deckId) {
     const deck  = DB.getDeck(deckId);
     const cards = DB.cardsForDeck(deckId);
 
-    // Compress deck + cards into URL hash
-    const payload = JSON.stringify({ deck, cards });
-    const compressed = LZString.compressToEncodedURIComponent(payload);
-    const url = `${location.origin}${location.pathname}#d=${compressed}`;
+    // Show modal immediately with loading spinner
+    document.getElementById('share-qr-wrap').innerHTML =
+      '<div class="d-flex justify-content-center align-items-center" style="height:220px;">' +
+      '<div class="spinner-border text-primary"></div></div>';
+    document.getElementById('share-url-input').value  = 'Wird hochgeladen…';
+    document.getElementById('share-code-box').textContent = '—';
+    this._currentShareUrl = null;
 
-    // Show URL in input
-    document.getElementById('share-url-input').value = url;
-    this._currentShareUrl = url;
+    const modal = new bootstrap.Modal(document.getElementById('shareModal'));
+    modal.show();
 
-    // Render QR code
-    const canvas = document.getElementById('share-qr-canvas');
-    QRCode.toCanvas(canvas, url, {
-      width: 220,
-      margin: 2,
-      color: { dark: '#212529', light: '#ffffff' },
-    }).catch(err => {
-      // URL might be too long for QR → show warning
-      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-      canvas.width = 220; canvas.height = 60;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#dc3545';
-      ctx.font = '13px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Deck zu groß für QR-Code.', 110, 25);
-      ctx.fillText('Bitte Link kopieren.', 110, 45);
+    try {
+      const gistId = await this._uploadGist(deck, cards);
+      const appUrl = `${location.origin}${location.pathname}#g=${gistId}`;
+      this._currentShareUrl = appUrl;
+
+      // QR-Code als Bild – kein JS-Library nötig
+      const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&ecc=M&data=${encodeURIComponent(appUrl)}`;
+      document.getElementById('share-qr-wrap').innerHTML =
+        `<img src="${qrSrc}" width="220" height="220" style="border-radius:12px;"
+              onerror="this.outerHTML='<p class=\\'text-muted small\\'>QR-Bild konnte nicht geladen werden.<br>Bitte Link kopieren.</p>'">`;
+
+      document.getElementById('share-url-input').value = appUrl;
+      // Show first 8 chars as short code
+      document.getElementById('share-code-box').textContent = gistId.slice(0, 8).toUpperCase();
+
+    } catch (err) {
+      document.getElementById('share-qr-wrap').innerHTML =
+        `<div class="text-danger small p-3">${err.message}</div>`;
+      document.getElementById('share-url-input').value = 'Fehler – bitte nochmal versuchen.';
+    }
+  },
+
+  async _uploadGist(deck, cards) {
+    const content = JSON.stringify({ deck, cards });
+    const res = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' },
+      body: JSON.stringify({
+        description: `LernApp: ${deck.name}`,
+        public: false,
+        files: { 'lernapp-deck.json': { content } },
+      }),
     });
-
-    new bootstrap.Modal(document.getElementById('shareModal')).show();
+    if (!res.ok) {
+      const msg = res.status === 403
+        ? 'GitHub Rate-Limit erreicht. Bitte in 1 Stunde nochmal versuchen.'
+        : `GitHub-Fehler (${res.status}). Bitte nochmal versuchen.`;
+      throw new Error(msg);
+    }
+    const json = await res.json();
+    return json.id;   // 32-char gist ID
   },
 
   copyShareUrl() {
-    const input = document.getElementById('share-url-input');
+    const val = this._currentShareUrl;
+    if (!val) return;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(input.value).then(() => showToast('Link kopiert!'));
+      navigator.clipboard.writeText(val).then(() => showToast('Link kopiert! ✓'));
     } else {
-      input.select(); document.execCommand('copy');
-      showToast('Link kopiert!');
+      const inp = document.getElementById('share-url-input');
+      inp.select(); document.execCommand('copy');
+      showToast('Link kopiert! ✓');
     }
   },
 
   nativeShare() {
-    const url = document.getElementById('share-url-input').value;
+    const url = this._currentShareUrl;
+    if (!url) return;
     if (navigator.share) {
-      navigator.share({ title: 'LernApp Deck', url }).catch(() => {});
+      navigator.share({ title: 'LernApp – Deck teilen', url }).catch(() => {});
     } else {
       this.copyShareUrl();
     }
   },
 
-  // ── Called on app start when #d= hash is detected ─────────────────────
-  detectURLImport(compressed) {
+  // ── Called on app start when #g=GIST_ID is detected ─────────────────────
+  async detectURLImport(gistId) {
+    gistId = gistId.trim();
+    if (!gistId) return;
     try {
-      const json = LZString.decompressFromEncodedURIComponent(compressed);
-      if (!json) return;
-      const data = JSON.parse(json);
-      if (!data.deck || !data.cards) return;
-
+      const data = await this._fetchGist(gistId);
       this._urlImportData = data;
-
-      const banner = document.getElementById('import-banner');
       document.getElementById('import-banner-name').textContent =
         `„${data.deck.name}" – ${data.cards.length} Karte${data.cards.length !== 1 ? 'n' : ''}`;
-      banner.classList.remove('d-none');
-
-      // Adjust body padding for banner
-      document.body.style.paddingTop = '120px';
+      document.getElementById('import-banner').classList.remove('d-none');
+      document.body.style.paddingTop = '130px';
     } catch {
-      // Invalid hash – ignore
+      // Invalid gist – silently ignore
     }
+  },
+
+  async _fetchGist(gistId) {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`,
+      { headers: { 'Accept': 'application/vnd.github+json' } });
+    if (!res.ok) throw new Error('Gist nicht gefunden');
+    const gist = await res.json();
+    const file = gist.files['lernapp-deck.json'];
+    if (!file) throw new Error('Keine LernApp-Daten in diesem Gist');
+    return JSON.parse(file.content);
   },
 
   confirmURLImport() {
@@ -87,14 +119,13 @@ const ImportView = {
     if (!data) return;
     const deck = { ...data.deck, id: uid() };
     DB.saveDeck(deck);
-    data.cards.forEach(c => DB.saveCard({ ...c, id: uid(), deckId: deck.id,
-      status: 0, correctStreak: 0, totalReviews: 0, lastReviewed: null, intervalDays: 1 }));
-
+    data.cards.forEach(c => DB.saveCard({
+      ...c, id: uid(), deckId: deck.id,
+      status: 0, correctStreak: 0, totalReviews: 0, lastReviewed: null, intervalDays: 1,
+    }));
     this.dismissURLImport();
     showToast(`✓ „${deck.name}" mit ${data.cards.length} Karten importiert!`);
     App.go('decks');
-
-    // Clear hash from URL
     history.replaceState(null, '', location.pathname);
   },
 
@@ -103,6 +134,40 @@ const ImportView = {
     document.body.style.paddingTop = '';
     this._urlImportData = null;
     history.replaceState(null, '', location.pathname);
+  },
+
+  // ── Import via manually-entered Gist URL or ID ───────────────────────────
+  async importFromCode() {
+    const raw = document.getElementById('sync-code-input').value.trim();
+    if (!raw) return;
+
+    // Accept full URL or bare gist ID
+    const gistId = raw.includes('github.com/gists/')
+      ? raw.split('github.com/gists/')[1].split(/[/?#]/)[0]
+      : raw.includes('#g=')
+        ? raw.split('#g=')[1].split(/[?#]/)[0]
+        : raw;
+
+    document.getElementById('sync-code-btn').disabled = true;
+    document.getElementById('sync-code-btn').textContent = '…';
+
+    try {
+      const data = await this._fetchGist(gistId);
+      const deck = { ...data.deck, id: uid() };
+      DB.saveDeck(deck);
+      data.cards.forEach(c => DB.saveCard({
+        ...c, id: uid(), deckId: deck.id,
+        status: 0, correctStreak: 0, totalReviews: 0, lastReviewed: null, intervalDays: 1,
+      }));
+      showToast(`✓ „${deck.name}" mit ${data.cards.length} Karten importiert!`);
+      document.getElementById('sync-code-input').value = '';
+      App.go('decks');
+    } catch (err) {
+      showToast('Fehler: ' + err.message);
+    } finally {
+      document.getElementById('sync-code-btn').disabled = false;
+      document.getElementById('sync-code-btn').textContent = 'Importieren';
+    }
   },
 
   // ── Tab switching ──────────────────────────────────────────────────────────
