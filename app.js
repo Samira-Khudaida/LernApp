@@ -657,5 +657,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     ImportView.detectURLImport(hash.slice(3));
   }
 
+  // Auto-pull from Gist if sync is configured (non-blocking)
+  ImportView.autoSync();
+
   App.go('decks');
 });
