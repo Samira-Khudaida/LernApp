@@ -49,6 +49,11 @@ const DB = {
   save(key, val) {
     localStorage.setItem(key, JSON.stringify(val));
     this._idbPut(key, val); // async fire-and-forget backup
+    // Debounced auto-sync: push to Gist 3s after last write
+    clearTimeout(this._syncTimer);
+    this._syncTimer = setTimeout(() => {
+      if (window.ImportView) ImportView._autoSyncAfterImport();
+    }, 3000);
   },
 
   saveDeck(deck) {
