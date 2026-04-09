@@ -1,6 +1,377 @@
 // ── Import / Export View ─────────────────────────────────────────────────────
 const ImportView = {
   _apkgCards: null,
+  _urlImportData: null,
+  _currentShareUrl: null,
+
+  // ── PAT / Sync storage helpers ───────────────────────────────────────────
+  get _pat()    { return localStorage.getItem('la_gh_pat')   || ''; },
+  get _gistId() { return localStorage.getItem('la_gist_id') || ''; },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  GitHub PAT-based Cross-Device Sync
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async savePAT() {
+    const pat = document.getElementById('pat-input').value.trim();
+    if (!pat) { showToast('Bitte Token eingeben.'); return; }
+
+    const btn = document.getElementById('pat-save-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verbinde…';
+
+    try {
+      const userRes = await fetch('https://api.github.com/user', {
+        headers: { 'Authorization': `token ${pat}`, 'Accept': 'application/vnd.github+json' },
+      });
+      if (!userRes.ok) throw new Error('Token ungültig oder fehlende Gist-Berechtigung.');
+      const user = await userRes.json();
+
+      const gistId = await this.findOrCreateMasterGist(pat);
+      localStorage.setItem('la_gh_pat', pat);
+      localStorage.setItem('la_gist_id', gistId);
+
+      this._updateSyncUI();
+      showToast(`✓ Verbunden als @${user.login}`);
+    } catch (err) {
+      showToast('Fehler: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-link-45deg me-2"></i>Verbinden';
+    }
+  },
+
+  async findOrCreateMasterGist(pat) {
+    const headers = {
+      'Authorization': `token ${pat}`,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    };
+
+    const listRes = await fetch('https://api.github.com/gists?per_page=100', { headers });
+    if (!listRes.ok) throw new Error('Gist-Liste konnte nicht geladen werden.');
+    const gists = await listRes.json();
+
+    const existing = gists.find(g =>
+      g.description === 'LernApp Sync Data' && g.files['lernapp-sync.json']);
+    if (existing) return existing.id;
+
+    const createRes = await fetch('https://api.github.com/gists', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        description: 'LernApp Sync Data',
+        public: false,
+        files: { 'lernapp-sync.json': { content: JSON.stringify({ decks: [], cards: [] }) } },
+      }),
+    });
+    if (!createRes.ok) throw new Error('Gist konnte nicht erstellt werden.');
+    const gist = await createRes.json();
+    return gist.id;
+  },
+
+  async syncToGist() {
+    const pat = this._pat, gistId = this._gistId;
+    if (!pat || !gistId) { showToast('Bitte zuerst Sync einrichten.'); return; }
+
+    const btn = document.getElementById('sync-push-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Lädt…'; }
+
+    try {
+      const content = JSON.stringify({ decks: DB.decks, cards: DB.cards });
+      const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `token ${pat}`,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ files: { 'lernapp-sync.json': { content } } }),
+      });
+      if (!res.ok) throw new Error(`Sync fehlgeschlagen (${res.status})`);
+
+      const now = new Date().toLocaleString('de-DE');
+      localStorage.setItem('la_last_sync', now);
+      this._updateSyncUI();
+      showToast('✓ Daten hochgeladen!');
+    } catch (err) {
+      showToast('Fehler: ' + err.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Hochladen'; }
+    }
+  },
+
+  async loadFromGist() {
+    const pat = this._pat, gistId = this._gistId;
+    if (!pat || !gistId) { showToast('Bitte zuerst Sync einrichten.'); return; }
+
+    const btn = document.getElementById('sync-pull-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Lädt…'; }
+
+    try {
+      const { newDecks, newCards } = await this._pullFromGist(pat, gistId);
+      const now = new Date().toLocaleString('de-DE');
+      localStorage.setItem('la_last_sync', now);
+      this._updateSyncUI();
+      showToast(`✓ ${newDecks} neue Deck(s), ${newCards} neue Karte(n) geladen!`);
+      if (newDecks > 0) App.go('decks');
+    } catch (err) {
+      showToast('Fehler: ' + err.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-download me-2"></i>Herunterladen'; }
+    }
+  },
+
+  async autoSync() {
+    const pat = this._pat, gistId = this._gistId;
+    if (!pat || !gistId) return;
+    try {
+      const { newDecks, newCards } = await this._pullFromGist(pat, gistId);
+      const now = new Date().toLocaleString('de-DE');
+      localStorage.setItem('la_last_sync', now);
+      if (newDecks > 0 || newCards > 0) {
+        showToast(`☁️ Sync: ${newDecks} neue Deck(s) geladen`);
+        App.go('decks');
+      }
+    } catch { /* silent fail on startup */ }
+  },
+
+  async _pullFromGist(pat, gistId) {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { 'Authorization': `token ${pat}`, 'Accept': 'application/vnd.github+json' },
+    });
+    if (!res.ok) throw new Error(`Laden fehlgeschlagen (${res.status})`);
+    const gist = await res.json();
+    const file = gist.files['lernapp-sync.json'];
+    if (!file) throw new Error('Keine Sync-Daten gefunden.');
+    const data = JSON.parse(file.content);
+    if (!data.decks || !data.cards) throw new Error('Ungültiges Sync-Format.');
+
+    const existingDeckIds = new Set(DB.decks.map(d => d.id));
+    const existingCardIds = new Set(DB.cards.map(c => c.id));
+    let newDecks = 0, newCards = 0;
+
+    for (const deck of data.decks) {
+      if (!existingDeckIds.has(deck.id)) { DB.saveDeck(deck); newDecks++; }
+    }
+    for (const card of data.cards) {
+      if (!existingCardIds.has(card.id)) { DB.saveCard(card); newCards++; }
+    }
+    return { newDecks, newCards };
+  },
+
+  async _autoSyncAfterImport() {
+    const pat = this._pat, gistId = this._gistId;
+    if (!pat || !gistId) return;
+    try {
+      const content = JSON.stringify({ decks: DB.decks, cards: DB.cards });
+      await fetch(`https://api.github.com/gists/${gistId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `token ${pat}`,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ files: { 'lernapp-sync.json': { content } } }),
+      });
+      localStorage.setItem('la_last_sync', new Date().toLocaleString('de-DE'));
+    } catch { /* silent */ }
+  },
+
+  _updateSyncUI() {
+    const pat = this._pat, gistId = this._gistId;
+    const setupCard  = document.getElementById('sync-setup-card');
+    const activeCard = document.getElementById('sync-active-card');
+    if (!setupCard || !activeCard) return;
+
+    if (pat && gistId) {
+      setupCard.classList.add('d-none');
+      activeCard.classList.remove('d-none');
+      const el = document.getElementById('sync-last-time');
+      if (el) el.textContent = localStorage.getItem('la_last_sync') || '—';
+    } else {
+      setupCard.classList.remove('d-none');
+      activeCard.classList.add('d-none');
+    }
+  },
+
+  disconnectSync() {
+    if (!confirm('Sync-Verbindung trennen? Lokale Daten bleiben erhalten.')) return;
+    localStorage.removeItem('la_gh_pat');
+    localStorage.removeItem('la_gist_id');
+    localStorage.removeItem('la_last_sync');
+    this._updateSyncUI();
+    showToast('Verbindung getrennt.');
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  QR-Code / Gist Sharing  (kein CDN nötig)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async showShareModal(deckId) {
+    const deck  = DB.getDeck(deckId);
+    const cards = DB.cardsForDeck(deckId);
+
+    // Show modal immediately with loading spinner
+    document.getElementById('share-qr-wrap').innerHTML =
+      '<div class="d-flex justify-content-center align-items-center" style="height:220px;">' +
+      '<div class="spinner-border text-primary"></div></div>';
+    document.getElementById('share-url-input').value  = 'Wird hochgeladen…';
+    document.getElementById('share-code-box').textContent = '—';
+    this._currentShareUrl = null;
+
+    const modal = new bootstrap.Modal(document.getElementById('shareModal'));
+    modal.show();
+
+    try {
+      const gistId = await this._uploadGist(deck, cards);
+      const appUrl = `${location.origin}${location.pathname}#g=${gistId}`;
+      this._currentShareUrl = appUrl;
+
+      // QR-Code als Bild – kein JS-Library nötig
+      const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&ecc=M&data=${encodeURIComponent(appUrl)}`;
+      document.getElementById('share-qr-wrap').innerHTML =
+        `<img src="${qrSrc}" width="220" height="220" style="border-radius:12px;"
+              onerror="this.outerHTML='<p class=\\'text-muted small\\'>QR-Bild konnte nicht geladen werden.<br>Bitte Link kopieren.</p>'">`;
+
+      document.getElementById('share-url-input').value = appUrl;
+      // Show first 8 chars as short code
+      document.getElementById('share-code-box').textContent = gistId.slice(0, 8).toUpperCase();
+
+    } catch (err) {
+      document.getElementById('share-qr-wrap').innerHTML =
+        `<div class="text-danger small p-3">${err.message}</div>`;
+      document.getElementById('share-url-input').value = 'Fehler – bitte nochmal versuchen.';
+    }
+  },
+
+  async _uploadGist(deck, cards) {
+    const content = JSON.stringify({ deck, cards });
+    const pat = this._pat;
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' };
+    if (pat) headers['Authorization'] = `token ${pat}`;
+
+    const res = await fetch('https://api.github.com/gists', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        description: `LernApp: ${deck.name}`,
+        public: false,
+        files: { 'lernapp-deck.json': { content } },
+      }),
+    });
+    if (!res.ok) {
+      let msg;
+      if (res.status === 401) msg = 'GitHub-Token fehlt oder ungültig. Bitte unter "Sync" einrichten.';
+      else if (res.status === 403) msg = 'GitHub Rate-Limit erreicht. Bitte später nochmal versuchen.';
+      else msg = `GitHub-Fehler (${res.status}). Bitte nochmal versuchen.`;
+      throw new Error(msg);
+    }
+    const json = await res.json();
+    return json.id;
+  },
+
+  copyShareUrl() {
+    const val = this._currentShareUrl;
+    if (!val) return;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(val).then(() => showToast('Link kopiert! ✓'));
+    } else {
+      const inp = document.getElementById('share-url-input');
+      inp.select(); document.execCommand('copy');
+      showToast('Link kopiert! ✓');
+    }
+  },
+
+  nativeShare() {
+    const url = this._currentShareUrl;
+    if (!url) return;
+    if (navigator.share) {
+      navigator.share({ title: 'LernApp – Deck teilen', url }).catch(() => {});
+    } else {
+      this.copyShareUrl();
+    }
+  },
+
+  // ── Called on app start when #g=GIST_ID is detected ─────────────────────
+  async detectURLImport(gistId) {
+    gistId = gistId.trim();
+    if (!gistId) return;
+    try {
+      const data = await this._fetchGist(gistId);
+      this._urlImportData = data;
+      document.getElementById('import-banner-name').textContent =
+        `„${data.deck.name}" – ${data.cards.length} Karte${data.cards.length !== 1 ? 'n' : ''}`;
+      document.getElementById('import-banner').classList.remove('d-none');
+      document.body.style.paddingTop = '130px';
+    } catch {
+      // Invalid gist – silently ignore
+    }
+  },
+
+  async _fetchGist(gistId) {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`,
+      { headers: { 'Accept': 'application/vnd.github+json' } });
+    if (!res.ok) throw new Error('Gist nicht gefunden');
+    const gist = await res.json();
+    const file = gist.files['lernapp-deck.json'];
+    if (!file) throw new Error('Keine LernApp-Daten in diesem Gist');
+    return JSON.parse(file.content);
+  },
+
+  confirmURLImport() {
+    const data = this._urlImportData;
+    if (!data) return;
+    const deck = { ...data.deck, id: uid() };
+    DB.saveDeck(deck);
+    data.cards.forEach(c => DB.saveCard({
+      ...c, id: uid(), deckId: deck.id,
+      status: 0, correctStreak: 0, totalReviews: 0, lastReviewed: null, intervalDays: 1,
+    }));
+    this.dismissURLImport();
+    showToast(`✓ „${deck.name}" mit ${data.cards.length} Karten importiert!`);
+    App.go('decks');
+    history.replaceState(null, '', location.pathname);
+  },
+
+  dismissURLImport() {
+    document.getElementById('import-banner').classList.add('d-none');
+    document.body.style.paddingTop = '';
+    this._urlImportData = null;
+    history.replaceState(null, '', location.pathname);
+  },
+
+  // ── Import via manually-entered Gist URL or ID ───────────────────────────
+  async importFromCode() {
+    const raw = document.getElementById('sync-code-input').value.trim();
+    if (!raw) return;
+
+    // Accept full URL or bare gist ID
+    const gistId = raw.includes('github.com/gists/')
+      ? raw.split('github.com/gists/')[1].split(/[/?#]/)[0]
+      : raw.includes('#g=')
+        ? raw.split('#g=')[1].split(/[?#]/)[0]
+        : raw;
+
+    document.getElementById('sync-code-btn').disabled = true;
+    document.getElementById('sync-code-btn').textContent = '…';
+
+    try {
+      const data = await this._fetchGist(gistId);
+      const deck = { ...data.deck, id: uid() };
+      DB.saveDeck(deck);
+      data.cards.forEach(c => DB.saveCard({
+        ...c, id: uid(), deckId: deck.id,
+        status: 0, correctStreak: 0, totalReviews: 0, lastReviewed: null, intervalDays: 1,
+      }));
+      showToast(`✓ „${deck.name}" mit ${data.cards.length} Karten importiert!`);
+      document.getElementById('sync-code-input').value = '';
+      App.go('decks');
+    } catch (err) {
+      showToast('Fehler: ' + err.message);
+    } finally {
+      document.getElementById('sync-code-btn').disabled = false;
+      document.getElementById('sync-code-btn').textContent = 'Importieren';
+    }
+  },
 
   // ── Tab switching ──────────────────────────────────────────────────────────
   switchTab(tab) {
@@ -10,6 +381,7 @@ const ImportView = {
       btn.classList.toggle('active', btn.dataset.tab === tab);
     });
     this._refreshDeckSelects();
+    if (tab === 'sync') this._updateSyncUI();
   },
 
   _refreshDeckSelects() {
@@ -103,6 +475,7 @@ const ImportView = {
     document.getElementById('csv-file-input').value = '';
     this._csvRows = [];
     this._refreshDeckSelects();
+    this._autoSyncAfterImport();
   },
 
   exportCSV() {
@@ -144,6 +517,7 @@ const ImportView = {
         }
         showToast(`✓ ${imports.length} Deck(s) mit ${totalCards} Karten importiert!`);
         this._refreshDeckSelects();
+        this._autoSyncAfterImport();
         input.value = '';
       } catch {
         showToast('Fehler: Ungültige JSON-Datei.');
@@ -235,6 +609,7 @@ const ImportView = {
     document.getElementById('apkg-file-input').value = '';
     this._apkgParsed = null;
     this._refreshDeckSelects();
+    this._autoSyncAfterImport();
   },
 
   _loadSqlJs() {

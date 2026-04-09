@@ -1,7 +1,8 @@
-const CACHE = 'lernapp-v1';
+const CACHE = 'lernapp-v6';
 const ASSETS = [
   './index.html',
   './app.js',
+  './import.js',
   './style.css',
   './manifest.json',
   './icons/icon-192.png',
