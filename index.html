@@ -55,6 +55,8 @@
       <ul class="dropdown-menu dropdown-menu-end">
         <li><button class="dropdown-item" id="detail-edit-btn">
           <i class="bi bi-pencil me-2"></i>Deck bearbeiten</button></li>
+        <li><button class="dropdown-item fw-semibold text-primary" id="detail-share-btn">
+          <i class="bi bi-qr-code me-2"></i>Per QR-Code teilen</button></li>
         <li><button class="dropdown-item" id="detail-export-csv-btn">
           <i class="bi bi-filetype-csv me-2"></i>Als CSV exportieren</button></li>
         <li><button class="dropdown-item" id="detail-export-json-btn">
@@ -280,59 +282,87 @@
 <!--  VIEW: Progress                                                       -->
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <div id="view-progress" class="view px-3 pt-3">
-  <div class="row g-3 mb-3">
+
+  <!-- Top: Ring + Traffic Light -->
+  <div class="d-flex gap-3 mb-3 align-items-stretch">
     <!-- Ring -->
-    <div class="col-5">
-      <div class="card shadow-sm h-100 text-center py-3">
-        <svg viewBox="0 0 120 120" width="100%" height="120">
-          <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="12"/>
-          <circle id="prog-ring-dash" cx="60" cy="60" r="50" fill="none" stroke="#198754"
-            stroke-width="12" stroke-dasharray="0 314.16" stroke-linecap="round"
-            transform="rotate(-90 60 60)" style="transition:stroke-dasharray .6s ease;"/>
-          <text id="prog-ring-pct" x="60" y="57" text-anchor="middle" font-size="20"
-                font-weight="bold" fill="#212529">0%</text>
-          <text id="prog-ring-label" x="60" y="73" text-anchor="middle" font-size="10"
-                fill="#6c757d">0/0</text>
-        </svg>
-        <div class="small text-muted">Fortschritt</div>
+    <div class="card shadow-sm flex-fill text-center py-3">
+      <svg viewBox="0 0 120 120" width="100%" height="110">
+        <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="12"/>
+        <circle id="prog-ring-dash" cx="60" cy="60" r="50" fill="none" stroke="#198754"
+          stroke-width="12" stroke-dasharray="0 314.16" stroke-linecap="round"
+          transform="rotate(-90 60 60)" style="transition:stroke-dasharray .6s ease;"/>
+        <text id="prog-ring-pct" x="60" y="55" text-anchor="middle" font-size="20"
+              font-weight="bold" fill="#212529">0%</text>
+        <text id="prog-ring-label" x="60" y="71" text-anchor="middle" font-size="10"
+              fill="#6c757d">0/0 gelernt</text>
+      </svg>
+      <div class="d-flex justify-content-center gap-2 small fw-semibold px-2 pb-1">
+        <span class="text-danger" id="prog-count-red-sm">0 ●</span>
+        <span class="text-warning" id="prog-count-yellow-sm">0 ●</span>
+        <span class="text-success" id="prog-count-green-sm">0 ●</span>
       </div>
     </div>
-    <!-- Ampel -->
-    <div class="col-7">
-      <div class="card shadow-sm h-100 p-3">
-        <div class="progress mb-3" style="height:12px;border-radius:8px;overflow:hidden;">
-          <div id="prog-bar-red"    class="progress-bar bg-danger"  style="width:0%;transition:width .5s;"></div>
-          <div id="prog-bar-yellow" class="progress-bar bg-warning" style="width:0%;transition:width .5s;"></div>
-          <div id="prog-bar-green"  class="progress-bar bg-success" style="width:0%;transition:width .5s;"></div>
+
+    <!-- Real Traffic Light -->
+    <div class="card shadow-sm px-3 py-3 d-flex flex-column align-items-center justify-content-center">
+      <div class="traffic-light-pole">
+        <div class="tl-housing">
+          <div class="tl-light tl-red"    id="tl-red"></div>
+          <div class="tl-light tl-yellow" id="tl-yellow"></div>
+          <div class="tl-light tl-green"  id="tl-green"></div>
         </div>
-        <div class="row g-2 text-center">
-          <div class="col-4">
-            <div id="prog-light-red" class="ampel-light red mb-1"></div>
-            <div class="fw-bold text-danger" id="prog-count-red">0</div>
-            <div style="font-size:.62rem;" class="text-muted">Unbekannt</div>
-          </div>
-          <div class="col-4">
-            <div id="prog-light-yellow" class="ampel-light yellow mb-1"></div>
-            <div class="fw-bold text-warning" id="prog-count-yellow">0</div>
-            <div style="font-size:.62rem;" class="text-muted">In Bearb.</div>
-          </div>
-          <div class="col-4">
-            <div id="prog-light-green" class="ampel-light green mb-1"></div>
-            <div class="fw-bold text-success" id="prog-count-green">0</div>
-            <div style="font-size:.62rem;" class="text-muted">Gelernt</div>
-          </div>
-        </div>
+        <div class="tl-pole"></div>
+        <div class="tl-base"></div>
+      </div>
+      <div class="small text-muted mt-2 text-center" id="tl-label" style="font-size:.65rem;max-width:60px;">—</div>
+    </div>
+  </div>
+
+  <!-- Segmented Learning Track -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body pb-2 pt-3 px-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="small fw-bold"><i class="bi bi-map me-1 text-primary"></i>Lernpfad</span>
+        <span class="text-muted small" id="prog-track-subtitle"></span>
+      </div>
+      <!-- Scrollable track -->
+      <div class="lernpfad-scroll">
+        <div class="lernpfad-track" id="lernpfad-track"></div>
+      </div>
+      <!-- Legend -->
+      <div class="d-flex gap-3 mt-2 small text-muted">
+        <span><span class="legend-dot" style="background:#dc3545;"></span> Unbekannt</span>
+        <span><span class="legend-dot" style="background:#ffc107;"></span> In Bearb.</span>
+        <span><span class="legend-dot" style="background:#198754;"></span> Gelernt</span>
+        <span><span class="legend-dot" style="background:#dee2e6;"></span> Neu</span>
       </div>
     </div>
   </div>
 
-  <!-- Path -->
-  <div class="card shadow-sm mb-3">
-    <div class="card-header py-2 small fw-semibold">
-      <i class="bi bi-map me-1 text-primary"></i>Lernpfad
+  <!-- Stacked bar -->
+  <div class="card shadow-sm mb-3 px-3 py-3">
+    <div class="progress mb-2" style="height:14px;border-radius:8px;overflow:hidden;">
+      <div id="prog-bar-red"    class="progress-bar bg-danger"  style="width:0%;transition:width .5s;"></div>
+      <div id="prog-bar-yellow" class="progress-bar bg-warning" style="width:0%;transition:width .5s;"></div>
+      <div id="prog-bar-green"  class="progress-bar bg-success" style="width:0%;transition:width .5s;"></div>
     </div>
-    <div class="card-body py-2">
-      <div class="progress-path" id="prog-path"></div>
+    <div class="row g-2 text-center">
+      <div class="col-4">
+        <div id="prog-light-red" class="ampel-light red mb-1"></div>
+        <div class="fw-bold text-danger" id="prog-count-red">0</div>
+        <div style="font-size:.62rem;" class="text-muted">Unbekannt</div>
+      </div>
+      <div class="col-4">
+        <div id="prog-light-yellow" class="ampel-light yellow mb-1"></div>
+        <div class="fw-bold text-warning" id="prog-count-yellow">0</div>
+        <div style="font-size:.62rem;" class="text-muted">In Bearb.</div>
+      </div>
+      <div class="col-4">
+        <div id="prog-light-green" class="ampel-light green mb-1"></div>
+        <div class="fw-bold text-success" id="prog-count-green">0</div>
+        <div style="font-size:.62rem;" class="text-muted">Gelernt</div>
+      </div>
     </div>
   </div>
 
@@ -529,9 +559,9 @@
           </button>
         </div>
         <p class="text-muted mt-2 mb-0" style="font-size:.7rem;">
-          <i class="bi bi-info-circle me-1"></i>
-          <strong>Herunterladen</strong>: holt neue Decks vom Cloud-Backup.<br>
-          <strong>Hochladen</strong>: speichert alle lokalen Decks in der Cloud.
+          <i class="bi bi-magic me-1"></i>
+          Änderungen werden <strong>automatisch</strong> hochgeladen (3 Sek. nach jeder Änderung).<br>
+          Beim App-Start wird automatisch heruntergeladen.
         </p>
       </div>
     </div>
@@ -551,6 +581,75 @@
 
 <!-- ── Toast ──────────────────────────────────────────────────────────── -->
 <div id="toast" class="toast-msg"></div>
+
+<!-- ── Share Modal ───────────────────────────────────────────────────── -->
+<div class="modal fade" id="shareModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-1">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-qr-code me-2 text-primary"></i>Deck teilen
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center pt-1">
+        <p class="text-muted small mb-2">
+          Scanne den QR-Code auf dem Handy (Kamera-App).<br>
+          Das Deck wird automatisch importiert.
+        </p>
+
+        <!-- QR image -->
+        <div class="d-flex justify-content-center mb-3" id="share-qr-wrap">
+          <div class="d-flex align-items-center justify-content-center" style="height:220px;">
+            <div class="spinner-border text-primary"></div>
+          </div>
+        </div>
+
+        <!-- Short code -->
+        <div class="mb-3 p-2 bg-light rounded">
+          <div class="text-muted small mb-1">Sync-Code (alternativ manuell eingeben)</div>
+          <div id="share-code-box" class="fw-bold fs-5 letter-spacing-2" style="font-family:monospace;letter-spacing:.15em;">—</div>
+        </div>
+
+        <!-- Copy URL -->
+        <div class="input-group input-group-sm mb-3">
+          <input id="share-url-input" type="text" class="form-control" readonly
+                 style="font-size:.68rem;"/>
+          <button class="btn btn-outline-secondary" onclick="ImportView.copyShareUrl()" title="Kopieren">
+            <i class="bi bi-clipboard"></i>
+          </button>
+        </div>
+
+        <!-- Native share -->
+        <div class="d-grid">
+          <button class="btn btn-primary" onclick="ImportView.nativeShare()">
+            <i class="bi bi-share me-2"></i>Link teilen (WhatsApp, Mail…)
+          </button>
+        </div>
+        <p class="text-muted mt-2 mb-0" style="font-size:.68rem;">
+          <i class="bi bi-cloud me-1"></i>
+          Deck wird sicher auf GitHub gespeichert – kein Account nötig.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Import-from-URL Banner (shown when app opened via share link) ── -->
+<div id="import-banner" class="d-none"
+     style="position:fixed;top:0;left:0;right:0;z-index:2000;
+            background:#0d6efd;color:#fff;padding:1rem;text-align:center;">
+  <strong><i class="bi bi-box-arrow-in-down me-2"></i>Deck importieren?</strong>
+  <p class="mb-2 small" id="import-banner-name"></p>
+  <div class="d-flex gap-2 justify-content-center">
+    <button class="btn btn-light btn-sm fw-bold" onclick="ImportView.confirmURLImport()">
+      <i class="bi bi-check-lg me-1"></i>Ja, importieren
+    </button>
+    <button class="btn btn-outline-light btn-sm" onclick="ImportView.dismissURLImport()">
+      Abbrechen
+    </button>
+  </div>
+</div>
 
 <!-- ── Bottom Navigation ─────────────────────────────────────────────── -->
 <nav class="bottom-nav">

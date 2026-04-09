@@ -475,7 +475,6 @@ const ImportView = {
     document.getElementById('csv-file-input').value = '';
     this._csvRows = [];
     this._refreshDeckSelects();
-    this._autoSyncAfterImport();
   },
 
   exportCSV() {
@@ -517,7 +516,6 @@ const ImportView = {
         }
         showToast(`✓ ${imports.length} Deck(s) mit ${totalCards} Karten importiert!`);
         this._refreshDeckSelects();
-        this._autoSyncAfterImport();
         input.value = '';
       } catch {
         showToast('Fehler: Ungültige JSON-Datei.');
@@ -609,7 +607,6 @@ const ImportView = {
     document.getElementById('apkg-file-input').value = '';
     this._apkgParsed = null;
     this._refreshDeckSelects();
-    this._autoSyncAfterImport();
   },
 
   _loadSqlJs() {
