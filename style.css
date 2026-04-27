@@ -101,6 +101,16 @@ body {
 }
 
 /* ── Rating Buttons ─────────────────────────────────────────────────────── */
+.study-card-actions {
+  display: flex;
+  justify-content: center;
+  gap: .5rem;
+}
+
+.study-card-actions .btn {
+  min-width: 108px;
+}
+
 .btn-rate {
   flex: 1;
   padding: .75rem .4rem;

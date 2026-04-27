@@ -331,9 +331,19 @@ const App = {
     document.getElementById('card-form-done').onclick = () => App.go('detail', { deckId });
   },
 
-  render_editCard({ deckId, cardId }) {
+  render_editCard({ deckId, cardId, returnTo }) {
     document.getElementById('fab').style.display = 'none';
     const card = DB.getCard(cardId);
+    const backTo = () => returnTo === 'study'
+      ? App.go('study', { deckId })
+      : App.go('detail', { deckId });
+
+    if (!card) {
+      showToast('Karte wurde nicht gefunden.');
+      backTo();
+      return;
+    }
+
     document.getElementById('card-edit-front').value = card.front;
     document.getElementById('card-edit-back').value  = card.back;
     document.getElementById('card-edit-form').onsubmit = (e) => {
@@ -342,9 +352,9 @@ const App = {
       card.back  = document.getElementById('card-edit-back').value.trim();
       if (!card.front || !card.back) return;
       DB.saveCard(card);
-      App.go('detail', { deckId });
+      backTo();
     };
-    document.getElementById('card-edit-done').onclick = () => App.go('detail', { deckId });
+    document.getElementById('card-edit-done').onclick = backTo;
   },
 
   // ── View: Study Mode ────────────────────────────────────────────────────
@@ -366,6 +376,8 @@ const App = {
     document.getElementById('btn-rate-0').onclick = () => this._rate(0);
     document.getElementById('btn-rate-1').onclick = () => this._rate(1);
     document.getElementById('btn-rate-2').onclick = () => this._rate(2);
+    document.getElementById('study-edit-card-btn').onclick = () => this._editStudyCard();
+    document.getElementById('study-delete-card-btn').onclick = () => this._deleteStudyCard();
     document.getElementById('study-restart-btn').onclick = () => App.go('study', { deckId });
     document.getElementById('study-progress-btn').onclick = () => App.go('progress', { deckId });
 
@@ -417,6 +429,39 @@ const App = {
       document.getElementById('study-flip-area').classList.add('d-none');
       document.getElementById('study-rate-area').classList.remove('d-none');
     }, 280);
+  },
+
+  _editStudyCard() {
+    const st = this._study;
+    const card = st.cards[st.idx];
+    if (!card) return;
+    App.go('editCard', { deckId: st.deckId, cardId: card.id, returnTo: 'study' });
+  },
+
+  _deleteStudyCard() {
+    const st = this._study;
+    const card = st.cards[st.idx];
+    if (!card || !confirm('Diese Karte wirklich l\u00f6schen?')) return;
+
+    DB.deleteCard(card.id);
+    delete st.ratings[card.id];
+    st.cards.splice(st.idx, 1);
+
+    if (!DB.cardsForDeck(st.deckId).length) {
+      showToast('Karte gel\u00f6scht.');
+      App.go('detail', { deckId: st.deckId });
+      return;
+    }
+
+    if (!st.cards.length) {
+      showToast('Karte gel\u00f6scht.');
+      this._showFinish();
+      return;
+    }
+
+    if (st.idx >= st.cards.length) st.idx = st.cards.length - 1;
+    showToast('Karte gel\u00f6scht.');
+    this._showStudyCard();
   },
 
   _rate(rating) {
